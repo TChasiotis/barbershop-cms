@@ -8,6 +8,7 @@ export default function Service({
   formData,
   setFormData,
   onNext,
+  lang,
 }: any) {
   return (
     <motion.div
@@ -17,12 +18,19 @@ export default function Service({
     >
       <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-zinc-900">
         <Scissors size={20} className="text-zinc-500" />
-        Επιλέξτε Υπηρεσία
+        {lang === "el" ? "Επιλέξτε Υπηρεσία" : "Select Service"}
       </h2>
 
       <div className="grid gap-3">
         {services.map((srv: any) => {
           const isSelected = formData.serviceId === srv.id;
+
+          // Όνομα ανάλογα με τη γλώσσα
+          const name = lang === "el" ? srv.name : srv.nameEn || srv.name;
+
+          // Η τιμή έρχεται κατευθείαν από τη βάση, όπως ακριβώς την έχεις γράψει
+          const price = srv.price;
+
           return (
             <div
               key={srv.id}
@@ -30,7 +38,7 @@ export default function Service({
                 setFormData({
                   ...formData,
                   serviceId: srv.id,
-                  serviceName: srv.name,
+                  serviceName: name,
                   serviceDuration: srv.duration,
                 })
               }
@@ -41,10 +49,8 @@ export default function Service({
               }`}
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-zinc-900 text-lg">
-                  {srv.name}
-                </span>
-                <span className="font-bold text-zinc-900">{srv.price}</span>
+                <span className="font-bold text-zinc-900 text-lg">{name}</span>
+                <span className="font-bold text-zinc-900">{price}</span>
               </div>
               <div className="text-sm text-zinc-500">{srv.duration}</div>
             </div>
@@ -57,7 +63,7 @@ export default function Service({
         onClick={onNext}
         className="w-full mt-8 bg-zinc-950 text-white py-4 rounded-xl font-bold text-lg hover:bg-zinc-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        Συνέχεια
+        {lang === "el" ? "Συνέχεια" : "Continue"}
       </button>
     </motion.div>
   );
