@@ -2,21 +2,17 @@
 
 import { useState } from "react";
 import { ChevronLeft } from "lucide-react";
+
+// Συνδέσαμε τα αρχεία που μόλις φτιάξαμε!
 import Service from "./service";
 import Calendar from "./calendar";
-// import Timeslots from "./timeslots";
-// import Details from "./details";
-
-// Θα τα φτιάξουμε αμέσως μετά!
-// import Step1Service from "./Step1_Service";
-// import Step2Calendar from "./Step2_Calendar";
-// import Step3TimeSlots from "./Step3_TimeSlots";
-// import Step4Details from "./Step4_Details";
+import Timeslots from "./timeslots";
+import Details from "./details";
 
 export default function BookingWizard({ services }: { services: any[] }) {
   const [step, setStep] = useState(1);
 
-  // Εδώ αποθηκεύουμε ΟΛΕΣ τις επιλογές του πελάτη
+  // Η "μνήμη" του Wizard
   const [formData, setFormData] = useState({
     serviceId: "",
     serviceName: "",
@@ -50,34 +46,39 @@ export default function BookingWizard({ services }: { services: any[] }) {
         </div>
       </div>
 
-      {/* BODY: Εδώ θα φορτώνουν τα βήματα (είναι σε σχόλια προς το παρόν) */}
+      {/* BODY: Εδώ φορτώνουν τα πραγματικά βήματα πλέον */}
       <div className="min-h-[300px]">
         {step === 1 && (
-          <div className="text-center py-10 text-zinc-500">
-            Εδώ θα μπει το Step1_Service
-          </div>
-          // <Step1Service services={services} formData={formData} setFormData={setFormData} onNext={nextStep} />
+          <Service
+            services={services}
+            formData={formData}
+            setFormData={setFormData}
+            onNext={nextStep}
+          />
         )}
 
         {step === 2 && (
-          <div className="text-center py-10 text-zinc-500">
-            Εδώ θα μπει το Step2_Calendar
-          </div>
-          // <Step2Calendar formData={formData} setFormData={setFormData} onNext={nextStep} />
+          <Calendar
+            formData={formData}
+            setFormData={setFormData}
+            onNext={nextStep}
+          />
         )}
 
         {step === 3 && (
-          <div className="text-center py-10 text-zinc-500">
-            Εδώ θα μπει το Step3_TimeSlots
-          </div>
-          // <Step3TimeSlots formData={formData} setFormData={setFormData} onNext={nextStep} />
+          <Timeslots
+            formData={formData}
+            setFormData={setFormData}
+            onNext={nextStep}
+          />
         )}
 
         {step === 4 && (
-          <div className="text-center py-10 text-zinc-500">
-            Εδώ θα μπει το Step4_Details
-          </div>
-          // <Step4Details formData={formData} setFormData={setFormData} onNext={nextStep} />
+          <Details
+            formData={formData}
+            setFormData={setFormData}
+            onNext={nextStep}
+          />
         )}
       </div>
     </div>
