@@ -355,7 +355,7 @@ export default function ClientHome({
               <span>{lang === "el" ? "EN" : "EL"}</span>
             </button>
             <a
-              href="#booking-demo"
+              href="/booking"
               className="bg-zinc-950 text-white px-5 py-2.5 rounded text-sm font-medium hover:bg-zinc-800 transition-colors"
             >
               {currentT.nav.book}
