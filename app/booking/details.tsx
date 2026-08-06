@@ -346,8 +346,8 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
           <p>
             {lang === "el"
-              ? "Μετά από 3 απουσίες (no-shows), ο λογαριασμός σας θα κλειδωθεί."
-              : "After 3 no-shows, your account will be restricted."}
+              ? "Πολιτική Κρατήσεων: Παρακαλούμε ενημερώστε μας έγκαιρα σε περίπτωση ακύρωσης. Μετά από 3 αδικαιολόγητες απουσίες (no-shows), ο λογαριασμός σας θα κλειδωθεί αυτόματα από το σύστημα."
+              : "Booking Policy: Please notify us of cancellations. After 3 unexplained no-shows, your account will be automatically restricted from making future bookings."}
           </p>
         </div>
       )}
