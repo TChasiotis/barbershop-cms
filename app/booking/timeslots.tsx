@@ -31,7 +31,6 @@ export default function Timeslots({
     async function fetchBookedTimes() {
       if (!formData.date) return;
 
-      // Σωστή ημερομηνία YYYY-MM-DD ανεξαρτήτως Timezone!
       const dateString = `${formData.date.getFullYear()}-${(formData.date.getMonth() + 1).toString().padStart(2, "0")}-${formData.date.getDate().toString().padStart(2, "0")}`;
 
       try {
@@ -40,7 +39,6 @@ export default function Timeslots({
           const data = await res.json();
           const fetchedAppointments = data.bookedData || [];
 
-          // ΤΟ ΜΥΣΤΙΚΟ: Υπολογίζουμε ΟΛΑ τα μπλοκαρισμένα μισάωρα!
           const occupied: string[] = [];
           fetchedAppointments.forEach((app: any) => {
             const start = app.time;
@@ -59,7 +57,6 @@ export default function Timeslots({
               mins += 30;
             }
           });
-
           setBookedSlots(occupied);
         }
       } catch (error) {
@@ -68,14 +65,23 @@ export default function Timeslots({
         setLoading(false);
       }
     }
-
     fetchBookedTimes();
   }, [formData.date]);
 
   const durationInMinutes = parseDurationToMinutes(formData.serviceDuration);
 
+  // ΕΛΕΓΧΟΣ ΣΗΜΕΡΙΝΗΣ ΗΜΕΡΑΣ (Για να κρύβει τις περασμένες ώρες)
+  const now = new Date();
+  const isToday =
+    formData.date &&
+    formData.date.getDate() === now.getDate() &&
+    formData.date.getMonth() === now.getMonth() &&
+    formData.date.getFullYear() === now.getFullYear();
+
+  const currentTotalMins = now.getHours() * 60 + now.getMinutes();
+
   const allSlots = [];
-  let currentMins = 10 * 60; // 10:00 το πρωί
+  let currentMins = 10 * 60; // 10:00
   while (currentMins < 21 * 60) {
     const h = Math.floor(currentMins / 60)
       .toString()
@@ -86,22 +92,23 @@ export default function Timeslots({
   }
 
   const availableSlots = allSlots.filter((slot) => {
-    // Αν χρειάζεται π.χ. 3 μπλοκς των 30λ (για 1.5 ώρα ραντεβού)
     const blocksNeeded = Math.ceil(durationInMinutes / 30);
     const [startH, startM] = slot.split(":").map(Number);
     let checkMins = startH * 60 + startM;
 
-    if (checkMins + durationInMinutes > 21 * 60) return false; // Βγαίνει εκτός ωραρίου
+    // 1. Έχει περάσει η ώρα σήμερα;
+    if (isToday && checkMins <= currentTotalMins) return false;
 
-    // Ελέγχουμε αν ΚΑΝΕΝΑ από τα επόμενα μισάωρα που χρειαζόμαστε δεν πέφτει σε πιασμένο
+    // 2. Βγαίνει εκτός ωραρίου;
+    if (checkMins + durationInMinutes > 21 * 60) return false;
+
+    // 3. Πέφτει πάνω σε άλλο ραντεβού;
     for (let i = 0; i < blocksNeeded; i++) {
       const hh = Math.floor(checkMins / 60)
         .toString()
         .padStart(2, "0");
       const mm = (checkMins % 60).toString().padStart(2, "0");
-      if (bookedSlots.includes(`${hh}:${mm}`)) {
-        return false;
-      }
+      if (bookedSlots.includes(`${hh}:${mm}`)) return false;
       checkMins += 30;
     }
     return true;

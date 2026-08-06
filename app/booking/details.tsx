@@ -9,22 +9,38 @@ import {
   Wallet,
   AlertTriangle,
   Ban,
+  Info,
 } from "lucide-react";
 
 export default function Details({ formData, setFormData, onNext, lang }: any) {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
-  const [isBlocked, setIsBlocked] = useState(false); // Για το LocalStorage spam
+  const [isBlocked, setIsBlocked] = useState(false);
+  const [userStrikes, setUserStrikes] = useState(0);
 
-  // 1. Ελέγχουμε αν η συσκευή έχει ήδη ενεργό ραντεβού
+  // Cookie Consent State
+  const [cookieConsent, setCookieConsent] = useState(true); // Προεπιλογή, αλλά ελέγχεται
+  const [showCookieBanner, setShowCookieBanner] = useState(false);
+
   useEffect(() => {
-    const activeBooking = localStorage.getItem("activeBooking");
-    if (activeBooking) {
-      // Αν βρούμε σημάδι, τον μπλοκάρουμε!
-      setIsBlocked(true);
+    // 1. ΕΛΕΓΧΟΣ COOKIES
+    const consent = localStorage.getItem("cookieConsent");
+    if (!consent) setShowCookieBanner(true);
+    else setCookieConsent(true);
+
+    // 2. ΕΛΕΓΧΟΣ & ΞΕΜΠΛΟΚΑΡΙΣΜΑ LOCALSTORAGE
+    const activeBookingExpiry = localStorage.getItem("activeBookingExpiry");
+    if (activeBookingExpiry) {
+      const expiryDate = new Date(activeBookingExpiry);
+      const now = new Date();
+      if (now > expiryDate) {
+        // Αν το ραντεβού πέρασε, ξεμπλοκάρουμε!
+        localStorage.removeItem("activeBookingExpiry");
+      } else {
+        setIsBlocked(true);
+      }
     }
 
-    // Αρχικοποιούμε τον τρόπο πληρωμής αν δεν υπάρχει
     if (!formData.paymentMethod) {
       setFormData((prev: any) => ({
         ...prev,
@@ -68,16 +84,13 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
   const phoneDigitsCount =
     formData.customerPhone?.replace(/\D/g, "").length || 0;
 
-  const handleSubmit = async () => {
-    if (formData.paymentMethod === "ONLINE") {
-      alert(
-        lang === "el"
-          ? "Εδώ θα άνοιγε το περιβάλλον της Stripe για την κάρτα (Demo)!"
-          : "Stripe checkout would open here (Demo)!",
-      );
-      // Για το demo, συνεχίζουμε κανονικά σαν να πλήρωσε
-    }
+  const acceptCookies = () => {
+    localStorage.setItem("cookieConsent", "true");
+    setCookieConsent(true);
+    setShowCookieBanner(false);
+  };
 
+  const handleSubmit = async () => {
     setLoading(true);
     try {
       const dateString = `${formData.date.getFullYear()}-${(formData.date.getMonth() + 1).toString().padStart(2, "0")}-${formData.date.getDate().toString().padStart(2, "0")}`;
@@ -91,15 +104,27 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           time: formData.time,
           customerName: formData.customerName,
           customerPhone: formData.customerPhone,
-          customerEmail: formData.customerEmail, // Στέλνουμε και το Email
-          paymentMethod: formData.paymentMethod, // Στέλνουμε πώς θα πληρώσει
+          customerEmail: formData.customerEmail,
+          paymentMethod: formData.paymentMethod,
         }),
       });
 
+      const data = await res.json();
+
       if (res.ok) {
         setIsSuccess(true);
-        // ΒΑΖΟΥΜΕ ΤΟ ΣΗΜΑΔΙ ΣΤΟΝ BROWSER!
-        localStorage.setItem("activeBooking", "true");
+        setUserStrikes(data.strikes || 0);
+
+        // Υπολογισμός λήξης Lock (Ημερομηνία + Ώρα Ραντεβού)
+        if (cookieConsent) {
+          const [h, m] = formData.time.split(":");
+          const expiryDate = new Date(formData.date);
+          expiryDate.setHours(parseInt(h), parseInt(m), 0, 0);
+          localStorage.setItem("activeBookingExpiry", expiryDate.toISOString());
+        }
+      } else if (res.status === 403) {
+        setUserStrikes(data.strikes || 3);
+        setIsBlocked(true);
       } else {
         alert(lang === "el" ? "Κάτι πήγε στραβά." : "Something went wrong.");
       }
@@ -109,7 +134,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
     setLoading(false);
   };
 
-  // --- ΟΘΟΝΗ ΑΝ ΕΙΝΑΙ ΜΠΛΟΚΑΡΙΣΜΕΝΟΣ (SPAM) ---
   if (isBlocked) {
     return (
       <motion.div
@@ -119,14 +143,22 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
       >
         <Ban size={64} className="text-red-500 mx-auto mb-6" />
         <h2 className="text-2xl font-bold text-zinc-900 mb-4">
-          {lang === "el"
-            ? "Έχετε ήδη ενεργή κράτηση"
-            : "You already have an active booking"}
+          {userStrikes >= 3
+            ? lang === "el"
+              ? "Ο λογαριασμός σας έχει περιοριστεί"
+              : "Account Restricted"
+            : lang === "el"
+              ? "Έχετε ήδη ενεργή κράτηση"
+              : "Active Booking Exists"}
         </h2>
         <p className="text-zinc-600 mb-8 max-w-md mx-auto">
-          {lang === "el"
-            ? "Φαίνεται πως έχετε ήδη κλείσει ένα ραντεβού. Για να αποφύγουμε διπλές κρατήσεις, επιτρέπεται μόνο ένα ενεργό ραντεβού ανά συσκευή."
-            : "It seems you already have a booking. To prevent spam, we only allow one active booking per device."}
+          {userStrikes >= 3
+            ? lang === "el"
+              ? `Έχετε ${userStrikes} strikes λόγω απουσίας (No-show). Η online κράτηση δεν είναι εφικτή.`
+              : `You have ${userStrikes} no-show strikes. Online booking is disabled.`
+            : lang === "el"
+              ? "Επιτρέπεται μόνο ένα ενεργό ραντεβού. Μόλις περάσει η ώρα του ραντεβού σας, η συσκευή θα ξεκλειδωθεί."
+              : "Only one active booking is allowed. Device will unlock after your appointment."}
         </p>
         <a
           href="/"
@@ -138,7 +170,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
     );
   }
 
-  // --- ΟΘΟΝΗ ΕΠΙΤΥΧΙΑΣ ---
   if (isSuccess) {
     return (
       <motion.div
@@ -150,7 +181,7 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
         <h2 className="text-3xl font-bold text-zinc-900 mb-2">
           {lang === "el" ? "Το ραντεβού έκλεισε!" : "Appointment Booked!"}
         </h2>
-        <p className="text-zinc-600 mb-8">
+        <p className="text-zinc-600 mb-6">
           {lang === "el" ? (
             <>
               Σας περιμένουμε στις{" "}
@@ -164,6 +195,20 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
             </>
           )}
         </p>
+
+        {/* FEEDBACK ΓΙΑ STRIKES (Αν έχει 1 ή 2) */}
+        {userStrikes > 0 && userStrikes < 3 && (
+          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-sm mx-auto max-w-sm flex gap-3 text-left">
+            <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
+            <div>
+              <strong>{lang === "el" ? "Προσοχή:" : "Warning:"}</strong>{" "}
+              {lang === "el"
+                ? `Έχετε καταγεγραμμένα ${userStrikes} Strike(s) για απουσία. Στα 3 Strikes το σύστημα θα σας μπλοκάρει.`
+                : `You have ${userStrikes} no-show strike(s). At 3 strikes, you will be blocked.`}
+            </div>
+          </div>
+        )}
+
         <a
           href="/"
           className="inline-block bg-zinc-950 text-white px-8 py-4 rounded-xl font-bold hover:bg-zinc-800"
@@ -180,6 +225,25 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
     >
+      {showCookieBanner && (
+        <div className="bg-zinc-900 text-white p-4 rounded-2xl mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm">
+          <div className="flex items-center gap-3">
+            <Info size={24} className="text-zinc-400 flex-shrink-0" />
+            <p>
+              {lang === "el"
+                ? "Χρησιμοποιούμε cookies για την ομαλή λειτουργία των κρατήσεων."
+                : "We use cookies to manage active bookings."}
+            </p>
+          </div>
+          <button
+            onClick={acceptCookies}
+            className="bg-white text-zinc-900 px-4 py-2 rounded-lg font-bold whitespace-nowrap"
+          >
+            {lang === "el" ? "Αποδοχή" : "Accept"}
+          </button>
+        </div>
+      )}
+
       <h2 className="text-xl font-bold mb-6 flex items-center gap-2 text-zinc-900">
         <User size={20} className="text-zinc-500" />
         {lang === "el" ? "Τα στοιχεία σας" : "Your Details"}
@@ -196,7 +260,7 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
             onChange={(e) =>
               setFormData({ ...formData, customerName: e.target.value })
             }
-            className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-medium"
+            className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-bold text-zinc-900 placeholder:text-zinc-400 transition-colors"
           />
         </div>
 
@@ -209,7 +273,7 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
               type="tel"
               value={formData.customerPhone || ""}
               onChange={handlePhoneChange}
-              className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-medium"
+              className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-bold text-zinc-900 placeholder:text-zinc-400 transition-colors"
             />
           </div>
           <div>
@@ -222,24 +286,19 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
               onChange={(e) =>
                 setFormData({ ...formData, customerEmail: e.target.value })
               }
-              className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-medium"
+              className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-bold text-zinc-900 placeholder:text-zinc-400 transition-colors"
             />
           </div>
         </div>
       </div>
 
-      {/* --- ΕΠΙΛΟΓΗ ΠΛΗΡΩΜΗΣ --- */}
       <h2 className="text-lg font-bold mb-4 text-zinc-900 border-t border-zinc-100 pt-6">
         {lang === "el" ? "Τρόπος Πληρωμής" : "Payment Method"}
       </h2>
       <div className="grid md:grid-cols-2 gap-4 mb-6">
         <button
           onClick={() => setFormData({ ...formData, paymentMethod: "STORE" })}
-          className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-            formData.paymentMethod === "STORE"
-              ? "border-zinc-900 bg-zinc-50"
-              : "border-zinc-200 hover:border-zinc-300"
-          }`}
+          className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${formData.paymentMethod === "STORE" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"}`}
         >
           <Wallet
             size={24}
@@ -254,18 +313,14 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
               {lang === "el" ? "Στο Ταμείο" : "Pay at Store"}
             </div>
             <div className="text-xs text-zinc-500">
-              {lang === "el" ? "Μετρητά ή Κάρτα (POS)" : "Cash or Card"}
+              {lang === "el" ? "Μετρητά ή Κάρτα" : "Cash or Card"}
             </div>
           </div>
         </button>
 
         <button
           onClick={() => setFormData({ ...formData, paymentMethod: "ONLINE" })}
-          className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
-            formData.paymentMethod === "ONLINE"
-              ? "border-zinc-900 bg-zinc-50"
-              : "border-zinc-200 hover:border-zinc-300"
-          }`}
+          className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${formData.paymentMethod === "ONLINE" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"}`}
         >
           <CreditCard
             size={24}
@@ -286,20 +341,24 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
         </button>
       </div>
 
-      {/* Προειδοποίηση αν επιλέξει ταμείο */}
       {formData.paymentMethod === "STORE" && (
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex gap-3 text-sm text-amber-800 mb-8">
           <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
           <p>
             {lang === "el"
-              ? "Πολιτική Κρατήσεων: Παρακαλούμε ενημερώστε μας έγκαιρα σε περίπτωση ακύρωσης. Μετά από 3 αδικαιολόγητες απουσίες (no-shows), ο λογαριασμός σας θα κλειδωθεί αυτόματα από το σύστημα."
-              : "Booking Policy: Please notify us of cancellations. After 3 unexplained no-shows, your account will be automatically restricted from making future bookings."}
+              ? "Μετά από 3 απουσίες (no-shows), ο λογαριασμός σας θα κλειδωθεί."
+              : "After 3 no-shows, your account will be restricted."}
           </p>
         </div>
       )}
 
       <button
-        disabled={!formData.customerName || phoneDigitsCount < 8 || loading}
+        disabled={
+          !formData.customerName ||
+          phoneDigitsCount < 8 ||
+          loading ||
+          showCookieBanner
+        }
         onClick={handleSubmit}
         className="w-full mt-4 bg-zinc-950 text-white py-4 rounded-xl font-bold text-lg hover:bg-zinc-800 transition-colors disabled:opacity-50"
       >

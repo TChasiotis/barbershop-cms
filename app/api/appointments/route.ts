@@ -16,6 +16,24 @@ export async function POST(req: Request) {
       serviceId,
     } = body;
 
+    // ΕΛΕΓΧΟΣ STRIKES ΚΑΙ ΑΝΑΚΤΗΣΗ ΤΟΥΣ
+    const strikeRecord = await prisma.customerStrike.findUnique({
+      where: { phone: customerPhone },
+    });
+
+    const currentStrikes = strikeRecord ? strikeRecord.strikes : 0;
+
+    if (currentStrikes >= 3) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "BLOCKED_BY_STRIKES",
+          strikes: currentStrikes,
+        },
+        { status: 403 },
+      );
+    }
+
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
@@ -28,7 +46,12 @@ export async function POST(req: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, appointment: newAppointment });
+    // Επιστρέφουμε ΚΑΙ τα strikes στην επιτυχία!
+    return NextResponse.json({
+      success: true,
+      appointment: newAppointment,
+      strikes: currentStrikes,
+    });
   } catch (error) {
     console.error("Booking Error:", error);
     return NextResponse.json(
