@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth";
 import { authOptions } from "../api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
-import prisma from "../lib/prisma"; // Σωστή διαδρομή αφού το lib είναι μέσα στο app
+import prisma from "../lib/prisma";
 import AdminDashboard from "./AdminDashboard";
 
 export const dynamic = "force-dynamic";
@@ -13,7 +13,6 @@ export default async function AdminPage() {
     redirect("/login");
   }
 
-  // Υπολογισμός κύκλου χρέωσης για το Remove.bg API (κάθε 19 του μήνα)
   const now = new Date();
   const resetDay = 19;
   let startOfBillingCycle;
@@ -29,24 +28,22 @@ export default async function AdminPage() {
   }
 
   const monthlyUploadsCount = await prisma.apiLog.count({
-    where: {
-      createdAt: {
-        gte: startOfBillingCycle,
-      },
-    },
+    where: { createdAt: { gte: startOfBillingCycle } },
   });
 
-  // Άντληση δεδομένων από τη βάση
   const services = await prisma.service.findMany({
     orderBy: { sortOrder: "asc" },
   });
-
   const products = await prisma.product.findMany({
     orderBy: { sortOrder: "asc" },
   });
-
   const gallery = await prisma.galleryImage.findMany({
     orderBy: { sortOrder: "asc" },
+  });
+
+  // ΝΕΟ: Τραβάμε τα strikes
+  const strikes = await prisma.customerStrike.findMany({
+    orderBy: { updatedAt: "desc" },
   });
 
   return (
@@ -54,6 +51,7 @@ export default async function AdminPage() {
       initialServices={services}
       initialProducts={products}
       initialGallery={gallery}
+      initialStrikes={strikes} // Το περνάμε εδώ!
       monthlyUploadsCount={monthlyUploadsCount}
     />
   );

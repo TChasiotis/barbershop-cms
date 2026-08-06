@@ -59,11 +59,22 @@ model Appointment {
   id            String   @id @default(cuid())
   customerName  String
   customerPhone String
-  date          DateTime // Η μέρα του ραντεβού
-  time          String   // Η ώρα, π.χ. "14:30"
-  status        String   @default("PENDING") // PENDING, CONFIRMED, CANCELLED
+  customerEmail String?  // ΝΕΟ: Προαιρετικό Email
+  paymentMethod String   @default("STORE") // ΝΕΟ: "STORE" ή "ONLINE"
+  date          DateTime 
+  time          String   
+  status        String   @default("PENDING") 
   serviceId     String
   service       Service  @relation(fields: [serviceId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+}
+
+model CustomerStrike {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  email     String?
+  strikes   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

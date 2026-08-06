@@ -19,6 +19,8 @@ import {
   Loader2,
   Menu,
   Camera,
+  ShieldAlert,
+  AlertTriangle,
 } from "lucide-react";
 import {
   createService,
@@ -32,17 +34,20 @@ import {
   updateAdminSettings,
   createGalleryImage,
   deleteGalleryImage,
+  addStrike,
+  deleteStrike,
 } from "./actions";
 
 export default function AdminDashboard({
   initialServices,
   initialProducts,
   initialGallery = [],
+  initialStrikes = [],
   monthlyUploadsCount = 0,
 }: any) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<
-    "services" | "products" | "gallery"
+    "services" | "products" | "gallery" | "strikes"
   >("services");
 
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -60,6 +65,10 @@ export default function AdminDashboard({
   // --- GALLERY STATES ---
   const [galleryFile, setGalleryFile] = useState<File | null>(null);
   const [isGalleryUploading, setIsGalleryUploading] = useState(false);
+
+  // --- STRIKE STATES ---
+  const [newStrikePhone, setNewStrikePhone] = useState("");
+  const [isStriking, setIsStriking] = useState(false);
 
   // --- SETTINGS & LOGOUT STATES ---
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -217,6 +226,17 @@ export default function AdminDashboard({
     }
   };
 
+  // --- STRIKE HANDLERS ---
+  const handleAddStrike = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newStrikePhone) return;
+    setIsStriking(true);
+    await addStrike(newStrikePhone);
+    setNewStrikePhone("");
+    setIsStriking(false);
+    router.refresh();
+  };
+
   // --- SETTINGS & LOGOUT HANDLERS ---
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -334,6 +354,16 @@ export default function AdminDashboard({
             >
               <Camera size={18} /> Our Work
             </button>
+            {/* ΝΕΟ TAB STRIKES */}
+            <button
+              onClick={() => {
+                setActiveTab("strikes");
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "strikes" ? "bg-white text-zinc-950" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}
+            >
+              <ShieldAlert size={18} /> Strikes
+            </button>
           </nav>
         </div>
 
@@ -371,6 +401,7 @@ export default function AdminDashboard({
                 {activeTab === "services" && "Manage Services"}
                 {activeTab === "products" && "Manage Products"}
                 {activeTab === "gallery" && "Manage Gallery (Our Work)"}
+                {activeTab === "strikes" && "Manage Strikes (No-Shows)"}
               </h2>
               {activeTab === "products" && (
                 <p className="text-xs font-medium text-zinc-500 mt-1">
@@ -388,9 +419,15 @@ export default function AdminDashboard({
                   Photos appear on the homepage in the order they are uploaded.
                 </p>
               )}
+              {activeTab === "strikes" && (
+                <p className="text-xs font-medium text-zinc-500 mt-1">
+                  Πελάτες που δεν εμφανίστηκαν. Στα 3 strikes μπλοκάρονται
+                  αυτόματα.
+                </p>
+              )}
             </div>
 
-            {activeTab !== "gallery" && (
+            {(activeTab === "services" || activeTab === "products") && (
               <button
                 onClick={
                   activeTab === "services" ? openNewService : openNewProduct
@@ -652,6 +689,126 @@ export default function AdminDashboard({
                     📸 No custom photos. The site displays default screenshots.
                   </div>
                 )}
+              </div>
+            </div>
+          )}
+
+          {/* VIEW / INTERFACE ΓΙΑ ΤΑ STRIKES */}
+          {activeTab === "strikes" && (
+            <div className="space-y-8">
+              {/* Φόρμα χειροκίνητης προσθήκης Strike */}
+              <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm max-w-xl">
+                <h3 className="font-bold text-zinc-900 mb-2 flex items-center gap-2">
+                  <AlertTriangle size={18} className="text-amber-500" />
+                  Χειροκίνητη Προσθήκη Strike
+                </h3>
+                <p className="text-sm text-zinc-500 mb-4">
+                  Αν κάποιος δεν εμφανίστηκε στο ραντεβού του, ρίξε του ένα
+                  strike εδώ.
+                </p>
+                <form
+                  onSubmit={handleAddStrike}
+                  className="flex flex-col sm:flex-row gap-4 items-start sm:items-center"
+                >
+                  <input
+                    type="text"
+                    required
+                    placeholder="Τηλέφωνο (π.χ. 69...)"
+                    value={newStrikePhone}
+                    onChange={(e) => setNewStrikePhone(e.target.value)}
+                    className="w-full px-4 py-2 border border-zinc-200 rounded-lg focus:ring-2 focus:ring-zinc-900 outline-none font-medium text-zinc-900"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isStriking || !newStrikePhone}
+                    className="bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-5 py-2.5 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2 whitespace-nowrap w-full sm:w-auto justify-center"
+                  >
+                    {isStriking ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Plus size={16} />
+                    )}
+                    Προσθήκη Strike
+                  </button>
+                </form>
+              </div>
+
+              {/* Λίστα με Strikes */}
+              <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse min-w-[600px]">
+                    <thead>
+                      <tr className="bg-zinc-50 border-b border-zinc-200 text-zinc-500 text-xs font-semibold uppercase tracking-wider">
+                        <th className="px-6 py-4">Τηλέφωνο</th>
+                        <th className="px-6 py-4">Email</th>
+                        <th className="px-6 py-4 text-center">
+                          Σύνολο Strikes
+                        </th>
+                        <th className="px-6 py-4 text-right">Ενέργειες</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-zinc-100 text-sm">
+                      {initialStrikes.map((strike: any) => {
+                        // Χρώματα ανάλογα με τα strikes
+                        let badgeColor =
+                          "bg-yellow-100 text-yellow-800 border-yellow-200";
+                        if (strike.strikes === 2)
+                          badgeColor =
+                            "bg-orange-100 text-orange-800 border-orange-200";
+                        if (strike.strikes >= 3)
+                          badgeColor = "bg-red-100 text-red-800 border-red-200";
+
+                        return (
+                          <tr
+                            key={strike.id}
+                            className="hover:bg-zinc-50/50 transition-colors"
+                          >
+                            <td className="px-6 py-4 font-bold text-zinc-900">
+                              {strike.phone}
+                            </td>
+                            <td className="px-6 py-4 text-zinc-500">
+                              {strike.email || "-"}
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span
+                                className={`inline-flex items-center justify-center w-8 h-8 rounded-full border-2 font-black ${badgeColor}`}
+                              >
+                                {strike.strikes}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <button
+                                onClick={async () => {
+                                  if (
+                                    window.confirm(
+                                      "Είστε σίγουροι ότι θέλετε να σβήσετε εντελώς το ιστορικό strikes αυτού του πελάτη;",
+                                    )
+                                  ) {
+                                    await deleteStrike(strike.id);
+                                    router.refresh();
+                                  }
+                                }}
+                                className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 hover:bg-red-100 rounded-md transition-colors"
+                              >
+                                Συγχώρεση (Διαγραφή)
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                      {initialStrikes.length === 0 && (
+                        <tr>
+                          <td
+                            colSpan={4}
+                            className="py-12 text-center text-zinc-400 font-medium"
+                          >
+                            Δεν υπάρχουν strikes! Οι πελάτες σας είναι άψογοι.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           )}

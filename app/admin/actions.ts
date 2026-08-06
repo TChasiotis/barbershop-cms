@@ -328,3 +328,28 @@ export async function updateAdminSettings(formData: FormData) {
     return { success: false, error: "Something went wrong." };
   }
 }
+
+// --- STRIKES ACTIONS ---
+export async function addStrike(phone: string, email?: string) {
+  const existing = await prisma.customerStrike.findUnique({ where: { phone } });
+
+  if (existing) {
+    await prisma.customerStrike.update({
+      where: { phone },
+      data: {
+        strikes: existing.strikes + 1,
+        email: email || existing.email, // Ενημερώνει το email αν δοθεί νέο
+      },
+    });
+  } else {
+    await prisma.customerStrike.create({
+      data: { phone, email, strikes: 1 },
+    });
+  }
+  revalidatePath("/admin");
+}
+
+export async function deleteStrike(id: string) {
+  await prisma.customerStrike.delete({ where: { id } });
+  revalidatePath("/admin");
+}

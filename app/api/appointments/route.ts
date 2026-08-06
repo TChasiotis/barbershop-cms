@@ -6,14 +6,22 @@ const prisma = new PrismaClient();
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { customerName, customerPhone, date, time, serviceId } = body;
+    const {
+      customerName,
+      customerPhone,
+      customerEmail,
+      paymentMethod,
+      date,
+      time,
+      serviceId,
+    } = body;
 
-    // Το date έρχεται πλέον ως καθαρό string π.χ. "2026-08-05"
-    // Προσθέτουμε T00:00:00Z για να σωθεί ακριβώς στη σωστή μέρα στο Prisma
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
         customerPhone,
+        customerEmail,
+        paymentMethod,
         date: new Date(`${date}T00:00:00Z`),
         time,
         serviceId,
