@@ -18,6 +18,21 @@ import {
 } from "lucide-react";
 import { updateAppointmentStatus } from "../actions";
 
+// Συνάρτηση υπολογισμού λεπτών (από το timeslots) για να ξέρουμε πόσα μισάωρα πιάνει το ραντεβού
+function parseDurationToMinutes(durationStr: string) {
+  if (!durationStr) return 30;
+  let totalMinutes = 0;
+  const hoursMatch = durationStr.match(/(\d+)\s*(ώ|h|ω)/i);
+  const minsMatch = durationStr.match(/(\d+)\s*(λ|m|min)/i);
+  if (hoursMatch) totalMinutes += parseInt(hoursMatch[1], 10) * 60;
+  if (minsMatch) totalMinutes += parseInt(minsMatch[1], 10);
+  if (totalMinutes === 0) {
+    const justNumber = parseInt(durationStr, 10);
+    totalMinutes = !isNaN(justNumber) ? justNumber : 30;
+  }
+  return totalMinutes;
+}
+
 export default function AgendaTab({
   initialAppointments,
 }: {
@@ -82,15 +97,55 @@ export default function AgendaTab({
     setIsCalendarOpen(false);
   };
 
+  // Απόλυτα ακριβές φιλτράρισμα βάσει ISO String (διορθώνει το πρόβλημα με τα παλιά ραντεβού)
   const selectedDateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, "0")}-${selectedDate.getDate().toString().padStart(2, "0")}`;
 
-  const dailyAppointments = initialAppointments
-    .filter((app: any) => {
-      const appDateObj = new Date(app.date);
-      const appDateStr = `${appDateObj.getFullYear()}-${(appDateObj.getMonth() + 1).toString().padStart(2, "0")}-${appDateObj.getDate().toString().padStart(2, "0")}`;
-      return appDateStr === selectedDateStr;
-    })
-    .sort((a: any, b: any) => a.time.localeCompare(b.time));
+  const dailyAppointments = initialAppointments.filter((app: any) => {
+    const appDateObj = new Date(app.date);
+    const appIsoStr = appDateObj.toISOString().split("T")[0];
+    return appIsoStr === selectedDateStr;
+  });
+
+  // --- ΔΗΜΙΟΥΡΓΙΑ ΣΥΝΕΧΟΥΣ TIMELINE (ΑΠΟ 10:00 ΕΩΣ 21:00) ---
+  const timeBlocks = [];
+  let currentMins = 10 * 60; // Ξεκινάμε 10:00 το πρωί
+  const endMins = 21 * 60; // Τελειώνουμε 21:00
+
+  while (currentMins < endMins) {
+    const hh = Math.floor(currentMins / 60)
+      .toString()
+      .padStart(2, "0");
+    const mm = (currentMins % 60).toString().padStart(2, "0");
+    const timeString = `${hh}:${mm}`;
+
+    // Ψάχνουμε αν υπάρχει ραντεβού σε αυτή τη συγκεκριμένη ώρα
+    const appsAtThisTime = dailyAppointments.filter(
+      (app) => app.time === timeString,
+    );
+    const activeApp = appsAtThisTime.find((app) => app.status !== "CANCELLED");
+    const targetApp = activeApp || appsAtThisTime[0];
+
+    if (targetApp) {
+      timeBlocks.push({
+        type: "appointment",
+        time: timeString,
+        data: targetApp,
+      });
+
+      // Αν το ραντεβού δεν είναι ακυρωμένο, "καταπίνει" τα επόμενα μισάωρα
+      if (targetApp.status !== "CANCELLED") {
+        const dur = parseDurationToMinutes(targetApp.service?.duration || "30");
+        const blocksToSkip = Math.max(1, Math.ceil(dur / 30));
+        currentMins += blocksToSkip * 30;
+      } else {
+        // Αν είναι ακυρωμένο, δεν μπλοκάρει τις επόμενες ώρες
+        currentMins += 30;
+      }
+    } else {
+      timeBlocks.push({ type: "empty", time: timeString });
+      currentMins += 30;
+    }
+  }
 
   const formattedHeaderDate = new Intl.DateTimeFormat("el-GR", {
     weekday: "long",
@@ -182,23 +237,46 @@ export default function AgendaTab({
           )}
         </div>
 
+        {/* Η ΛΙΣΤΑ ΤΗΣ ΑΤΖΕΝΤΑΣ ΜΕ ΟΛΕΣ ΤΙΣ ΩΡΕΣ */}
         <div className="bg-white rounded-2xl shadow-sm border border-zinc-200 overflow-hidden min-h-[400px]">
-          {dailyAppointments.length > 0 ? (
-            <div className="divide-y divide-zinc-100">
-              {dailyAppointments.map((app: any) => (
+          <div className="flex flex-col">
+            {timeBlocks.map((block, index) => {
+              if (block.type === "empty") {
+                return (
+                  <div
+                    key={`empty-${index}`}
+                    className="flex items-center gap-6 p-4 md:p-5 transition-colors border-b border-zinc-100 border-dashed opacity-50 bg-zinc-50/30"
+                  >
+                    <div className="font-bold text-xl text-zinc-400 w-20 flex-shrink-0">
+                      {block.time}
+                    </div>
+                    <div className="flex-1 text-zinc-400 font-medium text-sm md:text-base">
+                      -- Διαθέσιμο --
+                    </div>
+                  </div>
+                );
+              }
+
+              // Αν είναι ραντεβού
+              const app = block.data;
+              return (
                 <div
                   key={app.id}
                   onClick={() => setSelectedAppointment(app)}
-                  className={`flex items-center gap-6 p-5 cursor-pointer transition-colors ${app.status === "PENDING" ? "hover:bg-zinc-50" : "opacity-60 bg-zinc-50/50"}`}
+                  className={`flex items-center gap-6 p-4 md:p-5 cursor-pointer transition-colors border-b border-zinc-100 ${
+                    app.status === "PENDING"
+                      ? "hover:bg-zinc-50 bg-white"
+                      : "opacity-60 bg-zinc-50"
+                  }`}
                 >
-                  <div className="font-black text-2xl text-zinc-900 tracking-tight w-20 flex-shrink-0">
+                  <div className="font-black text-xl text-zinc-900 tracking-tight w-20 flex-shrink-0">
                     {app.time}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h4 className="text-lg font-bold text-zinc-900 truncate">
+                    <h4 className="text-base md:text-lg font-bold text-zinc-900 truncate">
                       {app.service?.name || "Άγνωστη Υπηρεσία"}
                     </h4>
-                    <p className="text-zinc-500 font-medium text-sm truncate">
+                    <p className="text-zinc-500 font-medium text-xs md:text-sm truncate">
                       {app.customerName}
                     </p>
                   </div>
@@ -220,16 +298,9 @@ export default function AgendaTab({
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-full py-20 text-zinc-400">
-              <CalendarDays size={48} className="mb-4 opacity-20" />
-              <p className="text-lg font-medium text-zinc-500">
-                Κανένα ραντεβού για αυτή τη μέρα.
-              </p>
-            </div>
-          )}
+              );
+            })}
+          </div>
         </div>
       </div>
 
@@ -299,13 +370,14 @@ export default function AgendaTab({
                 </div>
               </div>
 
+              {/* ΤΑ 2 ΜΟΝΑΔΙΚΑ ΚΟΥΜΠΙΑ ΕΛΕΓΧΟΥ (ΑΚΥΡΩΣΗ & NO-SHOW) */}
               {selectedAppointment.status === "PENDING" && (
                 <div className="pt-6 border-t border-zinc-100 flex flex-col gap-3">
                   <button
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Ακύρωση ραντεβού; Η ώρα θα ελευθερωθεί αμέσως στο σύστημα.",
+                          "Επιβεβαίωση Ακύρωσης; Η ώρα θα ελευθερωθεί στο σύστημα.",
                         )
                       ) {
                         await updateAppointmentStatus(
@@ -325,7 +397,7 @@ export default function AgendaTab({
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Ο πελάτης δεν εμφανίστηκε; Θα ακυρωθεί το ραντεβού και θα του δοθεί 1 Strike αυτόματα.",
+                          "Ο πελάτης δεν εμφανίστηκε; Θα του δοθεί 1 Strike αυτόματα.",
                         )
                       ) {
                         await updateAppointmentStatus(
