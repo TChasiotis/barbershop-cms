@@ -353,3 +353,23 @@ export async function deleteStrike(id: string) {
   await prisma.customerStrike.delete({ where: { id } });
   revalidatePath("/admin");
 }
+
+// --- APPOINTMENTS ACTIONS ---
+export async function updateAppointmentStatus(
+  id: string,
+  status: string,
+  phone: string,
+  email?: string,
+) {
+  await prisma.appointment.update({
+    where: { id },
+    data: { status },
+  });
+
+  // Αν ο μπαρμπέρης δηλώσει ότι ο πελάτης δεν ήρθε, ρίχνουμε αυτόματα Strike!
+  if (status === "NO-SHOW") {
+    await addStrike(phone, email || undefined);
+  }
+
+  revalidatePath("/admin");
+}
