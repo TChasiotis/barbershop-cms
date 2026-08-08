@@ -97,17 +97,16 @@ export default function AgendaTab({
     setIsCalendarOpen(false);
   };
 
-  // 1. ΔΙΟΡΘΩΣΗ: Φιλτράρισμα με χρήση ΤΟΠΙΚΗΣ ΩΡΑΣ (Αγνοούμε το UTC που έσπαγε τις μέρες)
+  // --- ΑΜΕΣΟ ΦΙΛΤΡΑΡΙΣΜΑ: Σύγκριση καθαρού String (YYYY-MM-DD) ---
+  const selectedDateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, "0")}-${selectedDate.getDate().toString().padStart(2, "0")}`;
+
   const dailyAppointments = initialAppointments.filter((app: any) => {
-    const appD = new Date(app.date);
-    return (
-      appD.getFullYear() === selectedDate.getFullYear() &&
-      appD.getMonth() === selectedDate.getMonth() &&
-      appD.getDate() === selectedDate.getDate()
-    );
+    // Το Prisma επιστρέφει "2026-08-08T00:00:00.000Z". Κόβουμε στο 'T' και κρατάμε το πρώτο κομμάτι!
+    const appDateStr = new Date(app.date).toISOString().split("T")[0];
+    return appDateStr === selectedDateStr;
   });
 
-  // 2. ΔΗΜΙΟΥΡΓΙΑ ΣΥΝΕΧΟΥΣ TIMELINE (ΑΠΟ 10:00 ΕΩΣ 21:00)
+  // --- ΔΗΜΙΟΥΡΓΙΑ ΣΥΝΕΧΟΥΣ TIMELINE (ΑΠΟ 10:00 ΕΩΣ 21:00) ---
   const timeBlocks = [];
   let currentMins = 10 * 60; // 10:00
   const endMins = 21 * 60; // 21:00
@@ -144,14 +143,6 @@ export default function AgendaTab({
     }
   }
 
-  // 3. ΕΥΡΕΣΗ "ΟΡΦΑΝΩΝ" ΡΑΝΤΕΒΟΥ (Ραντεβού που έγιναν σε τεστ εκτός του ωραρίου 10:00-21:00)
-  const placedAppointmentIds = timeBlocks
-    .filter((b) => b.type === "appointment")
-    .map((b) => b.data.id);
-  const orphanedAppointments = dailyAppointments.filter(
-    (app) => !placedAppointmentIds.includes(app.id),
-  );
-
   const formattedHeaderDate = new Intl.DateTimeFormat("el-GR", {
     weekday: "long",
     day: "numeric",
@@ -168,7 +159,6 @@ export default function AgendaTab({
       </div>
 
       <div className="max-w-3xl mx-auto">
-        {/* HEADER ΗΜΕΡΟΜΗΝΙΑΣ */}
         <div className="mb-6 relative">
           <button
             onClick={() => setIsCalendarOpen(!isCalendarOpen)}
@@ -188,7 +178,6 @@ export default function AgendaTab({
             </div>
           </button>
 
-          {/* ΗΜΕΡΟΛΟΓΙΟ */}
           {isCalendarOpen && (
             <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-2xl shadow-xl border border-zinc-100 p-6 z-20 animate-in fade-in slide-in-from-top-4">
               <div className="flex justify-between items-center mb-6">
@@ -252,7 +241,7 @@ export default function AgendaTab({
                 return (
                   <div
                     key={`empty-${index}`}
-                    className="flex items-center gap-6 p-4 md:p-5 transition-colors border-b border-zinc-100 border-dashed opacity-50 bg-zinc-50/30"
+                    className="flex items-center gap-6 p-4 md:p-5 transition-colors border-b border-zinc-100 border-dashed opacity-60 bg-zinc-50/50 hover:bg-zinc-50"
                   >
                     <div className="font-bold text-xl text-zinc-400 w-20 flex-shrink-0">
                       {block.time}
@@ -272,7 +261,7 @@ export default function AgendaTab({
                   className={`flex items-center gap-6 p-4 md:p-5 cursor-pointer transition-colors border-b border-zinc-100 ${
                     app.status === "PENDING"
                       ? "hover:bg-zinc-50 bg-white"
-                      : "opacity-60 bg-zinc-50"
+                      : "opacity-50 bg-zinc-50"
                   }`}
                 >
                   <div className="font-black text-xl text-zinc-900 tracking-tight w-20 flex-shrink-0">
@@ -289,7 +278,7 @@ export default function AgendaTab({
                   <div>
                     {app.status === "PENDING" && (
                       <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md">
-                        ΑΝΑΜΟΝΗ
+                        ΕΝΕΡΓΟ
                       </span>
                     )}
                     {app.status === "CANCELLED" && (
@@ -306,51 +295,6 @@ export default function AgendaTab({
                 </div>
               );
             })}
-
-            {/* ΟΡΦΑΝΑ ΡΑΝΤΕΒΟΥ ΠΟΥ ΕΚΛΕΙΣΕΣ ΣΕ ΠΑΛΙΑ ΤΕΣΤ ΕΚΤΟΣ ΩΡΑΡΙΟΥ */}
-            {orphanedAppointments.length > 0 && (
-              <div className="p-4 bg-amber-50/50 border-t-2 border-amber-200">
-                <h4 className="text-sm font-bold text-amber-800 mb-3 uppercase tracking-wider">
-                  Εκτος Κανονικου Ωραριου:
-                </h4>
-                {orphanedAppointments.map((app) => (
-                  <div
-                    key={app.id}
-                    onClick={() => setSelectedAppointment(app)}
-                    className="flex items-center gap-6 p-4 bg-white border border-amber-100 rounded-xl mb-2 cursor-pointer hover:shadow-sm transition-shadow"
-                  >
-                    <div className="font-black text-xl text-amber-700 tracking-tight w-20 flex-shrink-0">
-                      {app.time}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-base md:text-lg font-bold text-zinc-900 truncate">
-                        {app.service?.name || "Άγνωστη Υπηρεσία"}
-                      </h4>
-                      <p className="text-zinc-500 font-medium text-xs md:text-sm truncate">
-                        {app.customerName}
-                      </p>
-                    </div>
-                    <div>
-                      {app.status === "PENDING" && (
-                        <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md">
-                          ΑΝΑΜΟΝΗ
-                        </span>
-                      )}
-                      {app.status === "CANCELLED" && (
-                        <span className="bg-zinc-200 text-zinc-600 text-xs font-bold px-2.5 py-1 rounded-md">
-                          ΑΚΥΡΩΘΗΚΕ
-                        </span>
-                      )}
-                      {app.status === "NO-SHOW" && (
-                        <span className="bg-red-100 text-red-700 text-xs font-bold px-2.5 py-1 rounded-md">
-                          NO-SHOW
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -421,14 +365,13 @@ export default function AgendaTab({
                 </div>
               </div>
 
-              {/* ΤΑ 2 ΜΟΝΑΔΙΚΑ ΚΟΥΜΠΙΑ ΕΛΕΓΧΟΥ */}
               {selectedAppointment.status === "PENDING" && (
                 <div className="pt-6 border-t border-zinc-100 flex flex-col gap-3">
                   <button
                     onClick={async () => {
                       if (
                         window.confirm(
-                          "Επιβεβαίωση Ακύρωσης; Η ώρα θα ελευθερωθεί στο σύστημα.",
+                          "Επιβεβαίωση Ακύρωσης; Η ώρα θα ελευθερωθεί αμέσως στο σύστημα.",
                         )
                       ) {
                         await updateAppointmentStatus(
