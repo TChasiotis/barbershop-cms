@@ -1,36 +1,11 @@
-import { getServerSession } from "next-auth";
-import { authOptions } from "../api/auth/[...nextauth]/route";
-import { redirect } from "next/navigation";
-import prisma from "../lib/prisma";
+import { PrismaClient } from "@prisma/client";
 import AdminDashboard from "./AdminDashboard";
 
+const prisma = new PrismaClient();
 export const dynamic = "force-dynamic";
 
 export default async function AdminPage() {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    redirect("/login");
-  }
-
-  const now = new Date();
-  const resetDay = 19;
-  let startOfBillingCycle;
-
-  if (now.getDate() >= resetDay) {
-    startOfBillingCycle = new Date(now.getFullYear(), now.getMonth(), resetDay);
-  } else {
-    startOfBillingCycle = new Date(
-      now.getFullYear(),
-      now.getMonth() - 1,
-      resetDay,
-    );
-  }
-
-  const monthlyUploadsCount = await prisma.apiLog.count({
-    where: { createdAt: { gte: startOfBillingCycle } },
-  });
-
+  // 1. Τραβάμε τις Υπηρεσίες, Προϊόντα, Gallery, Strikes
   const services = await prisma.service.findMany({
     orderBy: { sortOrder: "asc" },
   });
@@ -40,19 +15,34 @@ export default async function AdminPage() {
   const gallery = await prisma.galleryImage.findMany({
     orderBy: { sortOrder: "asc" },
   });
-
-  // ΝΕΟ: Τραβάμε τα strikes
   const strikes = await prisma.customerStrike.findMany({
     orderBy: { updatedAt: "desc" },
   });
 
+  // 2. ΕΔΩ ΗΤΑΝ ΤΟ ΛΑΘΟΣ! Τραβάμε ΤΑ ΡΑΝΤΕΒΟΥ απευθείας από τη βάση!
+  const appointments = await prisma.appointment.findMany({
+    orderBy: [{ date: "desc" }, { time: "desc" }],
+    include: { service: true }, // Φέρνει και τα στοιχεία της υπηρεσίας
+  });
+
+  // 3. Υπολογισμός Uploads για το Remove.bg (Αν το έχεις κρατήσει)
+  const firstDayOfMonth = new Date();
+  firstDayOfMonth.setDate(1);
+  firstDayOfMonth.setHours(0, 0, 0, 0);
+
+  const monthlyUploads = await prisma.apiLog.count({
+    where: { createdAt: { gte: firstDayOfMonth } },
+  });
+
+  // 4. Περνάμε ΟΛΑ τα δεδομένα (και τα ραντεβού) στο Dashboard Component
   return (
     <AdminDashboard
       initialServices={services}
       initialProducts={products}
       initialGallery={gallery}
-      initialStrikes={strikes} // Το περνάμε εδώ!
-      monthlyUploadsCount={monthlyUploadsCount}
+      initialStrikes={strikes}
+      initialAppointments={appointments} // <--- ΑΥΤΟ ΕΛΕΙΠΕ ΚΑΙ ΗΤΑΝ ΑΔΕΙΟ ΤΟ AGENDA!
+      monthlyUploadsCount={monthlyUploads}
     />
   );
 }
