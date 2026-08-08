@@ -16,27 +16,28 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
+  // Ξεχωρίζουμε τον λόγο του block για να δείχνουμε το σωστό μήνυμα
+  const [blockReason, setBlockReason] = useState<
+    "LOCAL_STORAGE" | "STRIKES" | "PHONE_EXISTS" | ""
+  >("");
   const [userStrikes, setUserStrikes] = useState(0);
 
-  // Cookie Consent State
-  const [cookieConsent, setCookieConsent] = useState(true); // Προεπιλογή, αλλά ελέγχεται
+  const [cookieConsent, setCookieConsent] = useState(true);
   const [showCookieBanner, setShowCookieBanner] = useState(false);
 
   useEffect(() => {
-    // 1. ΕΛΕΓΧΟΣ COOKIES
     const consent = localStorage.getItem("cookieConsent");
     if (!consent) setShowCookieBanner(true);
     else setCookieConsent(true);
 
-    // 2. ΕΛΕΓΧΟΣ & ΞΕΜΠΛΟΚΑΡΙΣΜΑ LOCALSTORAGE
     const activeBookingExpiry = localStorage.getItem("activeBookingExpiry");
     if (activeBookingExpiry) {
       const expiryDate = new Date(activeBookingExpiry);
       const now = new Date();
       if (now > expiryDate) {
-        // Αν το ραντεβού πέρασε, ξεμπλοκάρουμε!
         localStorage.removeItem("activeBookingExpiry");
       } else {
+        setBlockReason("LOCAL_STORAGE");
         setIsBlocked(true);
       }
     }
@@ -115,7 +116,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
         setIsSuccess(true);
         setUserStrikes(data.strikes || 0);
 
-        // Υπολογισμός λήξης Lock (Ημερομηνία + Ώρα Ραντεβού)
         if (cookieConsent) {
           const [h, m] = formData.time.split(":");
           const expiryDate = new Date(formData.date);
@@ -124,6 +124,10 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
         }
       } else if (res.status === 403) {
         setUserStrikes(data.strikes || 3);
+        setBlockReason("STRIKES");
+        setIsBlocked(true);
+      } else if (res.status === 409) {
+        setBlockReason("PHONE_EXISTS");
         setIsBlocked(true);
       } else {
         alert(lang === "el" ? "Κάτι πήγε στραβά." : "Something went wrong.");
@@ -143,22 +147,30 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
       >
         <Ban size={64} className="text-red-500 mx-auto mb-6" />
         <h2 className="text-2xl font-bold text-zinc-900 mb-4">
-          {userStrikes >= 3
+          {blockReason === "STRIKES"
             ? lang === "el"
               ? "Ο λογαριασμός σας έχει περιοριστεί"
               : "Account Restricted"
-            : lang === "el"
-              ? "Έχετε ήδη ενεργή κράτηση"
-              : "Active Booking Exists"}
+            : blockReason === "PHONE_EXISTS"
+              ? lang === "el"
+                ? "Υπάρχει ήδη ραντεβού"
+                : "Active Booking Exists"
+              : lang === "el"
+                ? "Έχετε ήδη ενεργή κράτηση"
+                : "Active Booking Exists"}
         </h2>
         <p className="text-zinc-600 mb-8 max-w-md mx-auto">
-          {userStrikes >= 3
+          {blockReason === "STRIKES"
             ? lang === "el"
               ? `Έχετε ${userStrikes} strikes λόγω απουσίας (No-show). Η online κράτηση δεν είναι εφικτή.`
               : `You have ${userStrikes} no-show strikes. Online booking is disabled.`
-            : lang === "el"
-              ? "Επιτρέπεται μόνο ένα ενεργό ραντεβού. Μόλις περάσει η ώρα του ραντεβού σας, η συσκευή θα ξεκλειδωθεί."
-              : "Only one active booking is allowed. Device will unlock after your appointment."}
+            : blockReason === "PHONE_EXISTS"
+              ? lang === "el"
+                ? "Έχετε ήδη ένα ενεργό ραντεβού κλεισμένο με αυτόν τον αριθμό τηλεφώνου. Επιτρέπεται μόνο ένα ραντεβού ανά τηλέφωνο."
+                : "An active booking already exists for this phone number. Only one booking per phone is allowed."
+              : lang === "el"
+                ? "Επιτρέπεται μόνο ένα ενεργό ραντεβού ανά συσκευή. Μόλις περάσει η ώρα του ραντεβού σας, η συσκευή θα ξεκλειδωθεί."
+                : "Only one active booking is allowed per device. It will unlock after your appointment."}
         </p>
         <a
           href="/"
@@ -196,7 +208,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           )}
         </p>
 
-        {/* FEEDBACK ΓΙΑ STRIKES (Αν έχει 1 ή 2) */}
         {userStrikes > 0 && userStrikes < 3 && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-sm mx-auto max-w-sm flex gap-3 text-left">
             <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
@@ -346,8 +357,8 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           <AlertTriangle size={20} className="text-amber-600 flex-shrink-0" />
           <p>
             {lang === "el"
-              ? "Πολιτική Κρατήσεων: Παρακαλούμε ενημερώστε μας έγκαιρα σε περίπτωση ακύρωσης. Μετά από 3 αδικαιολόγητες απουσίες (no-shows), ο λογαριασμός σας θα κλειδωθεί αυτόματα από το σύστημα."
-              : "Booking Policy: Please notify us of cancellations. After 3 unexplained no-shows, your account will be automatically restricted from making future bookings."}
+              ? "Μετά από 3 απουσίες (no-shows), ο λογαριασμός σας θα κλειδωθεί."
+              : "After 3 no-shows, your account will be restricted."}
           </p>
         </div>
       )}

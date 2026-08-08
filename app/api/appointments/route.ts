@@ -16,7 +16,7 @@ export async function POST(req: Request) {
       serviceId,
     } = body;
 
-    // ΕΛΕΓΧΟΣ STRIKES ΚΑΙ ΑΝΑΚΤΗΣΗ ΤΟΥΣ
+    // 1. ΕΛΕΓΧΟΣ STRIKES (Ποινές)
     const strikeRecord = await prisma.customerStrike.findUnique({
       where: { phone: customerPhone },
     });
@@ -30,10 +30,44 @@ export async function POST(req: Request) {
           error: "BLOCKED_BY_STRIKES",
           strikes: currentStrikes,
         },
-        { status: 403 },
+        { status: 403 }, // 403 Forbidden
       );
     }
 
+    // 2. ΕΛΕΓΧΟΣ ΓΙΑ ΕΝΕΡΓΟ ΡΑΝΤΕΒΟΥ ΜΕ ΤΟ ΙΔΙΟ ΤΗΛΕΦΩΝΟ
+    const startOfToday = new Date();
+    startOfToday.setUTCHours(0, 0, 0, 0);
+
+    const futureAppointments = await prisma.appointment.findMany({
+      where: {
+        customerPhone,
+        status: "PENDING",
+        date: { gte: startOfToday }, // Τραβάμε τα σημερινά και τα μελλοντικά
+      },
+    });
+
+    const now = new Date();
+    const hasActiveBooking = futureAppointments.some((app) => {
+      const appDate = new Date(app.date);
+      const [h, m] = app.time.split(":").map(Number);
+
+      // Αν το ραντεβού είναι σε επόμενη μέρα, τότε σίγουρα είναι ενεργό
+      if (appDate > startOfToday) return true;
+
+      // Αν το ραντεβού είναι σήμερα, ελέγχουμε αν έχει περάσει η ώρα
+      const currentMins = now.getHours() * 60 + now.getMinutes();
+      const appMins = h * 60 + m;
+      return appMins >= currentMins;
+    });
+
+    if (hasActiveBooking) {
+      return NextResponse.json(
+        { success: false, error: "PHONE_ALREADY_BOOKED" },
+        { status: 409 }, // 409 Conflict (Διένεξη δεδομένων)
+      );
+    }
+
+    // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
@@ -46,7 +80,6 @@ export async function POST(req: Request) {
       },
     });
 
-    // Επιστρέφουμε ΚΑΙ τα strikes στην επιτυχία!
     return NextResponse.json({
       success: true,
       appointment: newAppointment,
@@ -78,7 +111,6 @@ export async function GET(req: Request) {
         date: { gte: startOfDay, lte: endOfDay },
         status: { not: "CANCELLED" },
       },
-      // ΕΔΩ Η ΑΛΛΑΓΗ: Ζητάμε από τη βάση ΚΑΙ τη διάρκεια της υπηρεσίας
       include: { service: { select: { duration: true } } },
     });
 
