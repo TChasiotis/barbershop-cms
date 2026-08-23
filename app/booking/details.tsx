@@ -14,7 +14,7 @@ import {
 
 export default function Details({ formData, setFormData, onNext, lang }: any) {
   const [loading, setLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false); // Το αφήνουμε για να μην πειράξουμε τα states σου
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockReason, setBlockReason] = useState<
     "LOCAL_STORAGE" | "STRIKES" | "PHONE_EXISTS" | ""
@@ -120,7 +120,10 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           localStorage.setItem("activeBookingExpiry", expiryDate.toISOString());
         }
 
-        // --- ΝΕΟ: ΕΛΕΓΧΟΣ ΓΙΑ STRIPE ΑΝ ΕΠΕΛΕΞΕ ONLINE ---
+        const dateStr = `${formData.date.getFullYear()}-${(formData.date.getMonth() + 1).toString().padStart(2, "0")}-${formData.date.getDate().toString().padStart(2, "0")}`;
+        const currentStrikes = data.strikes || 0;
+
+        // 2. ΕΛΕΓΧΟΣ ΓΙΑ STRIPE AN EINAI ONLINE
         if (formData.paymentMethod === "ONLINE") {
           try {
             const stripeRes = await fetch("/api/checkout", {
@@ -130,13 +133,17 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
                 serviceName: formData.serviceName || "Ραντεβού - Urban Fade",
                 price: formData.servicePrice || "15",
                 appointmentId: data.appointment?.id || "",
+                date: dateStr,
+                time: formData.time,
+                lang: lang || "el",
+                strikes: currentStrikes,
               }),
             });
 
             const stripeData = await stripeRes.json();
 
             if (stripeData.url) {
-              window.location.href = stripeData.url; // Ανακατεύθυνση στο Stripe
+              window.location.href = stripeData.url; // GO TO STRIPE!
               return;
             } else {
               alert(`Stripe Error: ${stripeData.error || "Unknown error"}`);
@@ -155,9 +162,9 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           }
         }
 
-        // --- ΑΝ ΕΙΝΑΙ ΣΤΟ ΤΑΜΕΙΟ (STORE) ΠΡΟΧΩΡΑΕΙ ΚΑΝΟΝΙΚΑ ---
-        setIsSuccess(true);
-        setUserStrikes(data.strikes || 0);
+        // 3. ΑΝ ΗΤΑΝ ΜΕΤΡΗΤΑ, ΤΟΝ ΣΤΕΛΝΟΥΜΕ ΣΤΗΝ ΚΟΙΝΗ ΣΕΛΙΔΑ ΕΠΙΤΥΧΙΑΣ ΣΤΟ /booking/success
+        window.location.href = `/booking/success?date=${dateStr}&time=${formData.time}&lang=${lang || "el"}&strikes=${currentStrikes}`;
+        return;
       } else if (res.status === 403) {
         setUserStrikes(data.strikes || 3);
         setBlockReason("STRIKES");
@@ -217,52 +224,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           className="inline-block bg-zinc-900 text-white px-8 py-3 rounded-xl font-bold"
         >
           {lang === "el" ? "Αρχική" : "Home"}
-        </a>
-      </motion.div>
-    );
-  }
-
-  if (isSuccess) {
-    return (
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        className="text-center py-8"
-      >
-        <CheckCircle2 size={72} className="text-green-500 mx-auto mb-6" />
-        <h2 className="text-3xl font-bold text-zinc-900 mb-2">
-          {lang === "el" ? "Το ραντεβού έκλεισε!" : "Appointment Booked!"}
-        </h2>
-        <p className="text-zinc-600 mb-6">
-          {lang === "el" ? (
-            <>
-              Σας περιμένουμε στις{" "}
-              <strong>{formatDate(formData.date, lang)}</strong> στις{" "}
-              <strong>{formData.time}</strong>.
-            </>
-          ) : (
-            <>
-              See you on <strong>{formatDate(formData.date, lang)}</strong> at{" "}
-              <strong>{formData.time}</strong>.
-            </>
-          )}
-        </p>
-        {userStrikes > 0 && userStrikes < 3 && (
-          <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-sm mx-auto max-w-sm flex gap-3 text-left">
-            <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
-            <div>
-              <strong>{lang === "el" ? "Προσοχή:" : "Warning:"}</strong>{" "}
-              {lang === "el"
-                ? `Έχετε καταγεγραμμένα ${userStrikes} Strike(s) για απουσία. Στα 3 Strikes το σύστημα θα σας μπλοκάρει.`
-                : `You have ${userStrikes} no-show strike(s). At 3 strikes, you will be blocked.`}
-            </div>
-          </div>
-        )}
-        <a
-          href="/"
-          className="inline-block bg-zinc-950 text-white px-8 py-4 rounded-xl font-bold hover:bg-zinc-800"
-        >
-          {lang === "el" ? "Επιστροφή στην Αρχική" : "Back to Home"}
         </a>
       </motion.div>
     );
