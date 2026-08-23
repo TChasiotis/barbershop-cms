@@ -16,7 +16,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
-  // Ξεχωρίζουμε τον λόγο του block για να δείχνουμε το σωστό μήνυμα
   const [blockReason, setBlockReason] = useState<
     "LOCAL_STORAGE" | "STRIKES" | "PHONE_EXISTS" | ""
   >("");
@@ -96,6 +95,7 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
     try {
       const dateString = `${formData.date.getFullYear()}-${(formData.date.getMonth() + 1).toString().padStart(2, "0")}-${formData.date.getDate().toString().padStart(2, "0")}`;
 
+      // 1. ΚΑΤΑΧΩΡΗΣΗ ΤΟΥ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ ΜΑΣ
       const res = await fetch("/api/appointments", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -120,26 +120,42 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           localStorage.setItem("activeBookingExpiry", expiryDate.toISOString());
         }
 
-        // ΑΝ ΔΙΑΛΕΞΕ ONLINE ΠΛΗΡΩΜΗ
+        // --- ΝΕΟ: ΕΛΕΓΧΟΣ ΓΙΑ STRIPE ΑΝ ΕΠΕΛΕΞΕ ONLINE ---
         if (formData.paymentMethod === "ONLINE") {
-          const stripeRes = await fetch("/api/checkout", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              serviceName: "Ραντεβού - Urban Fade",
-              price: "15", // Αν έχεις την τιμή στο formData, βάλτη εδώ (π.χ. formData.servicePrice)
-              appointmentId: data.appointment.id,
-            }),
-          });
+          try {
+            const stripeRes = await fetch("/api/checkout", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                serviceName: formData.serviceName || "Ραντεβού - Urban Fade",
+                price: formData.servicePrice || "15",
+                appointmentId: data.appointment?.id || "",
+              }),
+            });
 
-          const stripeData = await stripeRes.json();
-          if (stripeData.url) {
-            window.location.href = stripeData.url; // Τον στέλνουμε στο Stripe!
+            const stripeData = await stripeRes.json();
+
+            if (stripeData.url) {
+              window.location.href = stripeData.url; // Ανακατεύθυνση στο Stripe
+              return;
+            } else {
+              alert(`Stripe Error: ${stripeData.error || "Unknown error"}`);
+              setLoading(false);
+              return;
+            }
+          } catch (stripeErr) {
+            console.error("Stripe redirect failed:", stripeErr);
+            alert(
+              lang === "el"
+                ? "Το σύστημα πληρωμών δεν ανταποκρίνεται. Παρακαλώ δοκιμάστε ξανά."
+                : "Payment system is not responding. Please try again.",
+            );
+            setLoading(false);
             return;
           }
         }
 
-        // ΑΝ ΔΙΑΛΕΞΕ ΤΑΜΕΙΟ (STORE)
+        // --- ΑΝ ΕΙΝΑΙ ΣΤΟ ΤΑΜΕΙΟ (STORE) ΠΡΟΧΩΡΑΕΙ ΚΑΝΟΝΙΚΑ ---
         setIsSuccess(true);
         setUserStrikes(data.strikes || 0);
       } else if (res.status === 403) {
@@ -150,7 +166,11 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
         setBlockReason("PHONE_EXISTS");
         setIsBlocked(true);
       } else {
-        alert(lang === "el" ? "Κάτι πήγε στραβά." : "Something went wrong.");
+        alert(
+          lang === "el"
+            ? "Κάτι πήγε στραβά με την κράτηση."
+            : "Something went wrong.",
+        );
       }
     } catch (error) {
       console.error(error);
@@ -227,7 +247,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
             </>
           )}
         </p>
-
         {userStrikes > 0 && userStrikes < 3 && (
           <div className="bg-amber-50 border border-amber-200 text-amber-800 p-4 rounded-xl mb-6 text-sm mx-auto max-w-sm flex gap-3 text-left">
             <AlertTriangle size={20} className="flex-shrink-0 mt-0.5" />
@@ -239,7 +258,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
             </div>
           </div>
         )}
-
         <a
           href="/"
           className="inline-block bg-zinc-950 text-white px-8 py-4 rounded-xl font-bold hover:bg-zinc-800"
@@ -294,7 +312,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
             className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-bold text-zinc-900 placeholder:text-zinc-400 transition-colors"
           />
         </div>
-
         <div className="grid md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-bold text-zinc-900 mb-2">
@@ -348,7 +365,6 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
             </div>
           </div>
         </button>
-
         <button
           onClick={() => setFormData({ ...formData, paymentMethod: "ONLINE" })}
           className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${formData.paymentMethod === "ONLINE" ? "border-zinc-900 bg-zinc-50" : "border-zinc-200 hover:border-zinc-300"}`}
