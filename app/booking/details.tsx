@@ -113,15 +113,35 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
       const data = await res.json();
 
       if (res.ok) {
-        setIsSuccess(true);
-        setUserStrikes(data.strikes || 0);
-
         if (cookieConsent) {
           const [h, m] = formData.time.split(":");
           const expiryDate = new Date(formData.date);
           expiryDate.setHours(parseInt(h), parseInt(m), 0, 0);
           localStorage.setItem("activeBookingExpiry", expiryDate.toISOString());
         }
+
+        // ΑΝ ΔΙΑΛΕΞΕ ONLINE ΠΛΗΡΩΜΗ
+        if (formData.paymentMethod === "ONLINE") {
+          const stripeRes = await fetch("/api/checkout", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              serviceName: "Ραντεβού - Urban Fade",
+              price: "15", // Αν έχεις την τιμή στο formData, βάλτη εδώ (π.χ. formData.servicePrice)
+              appointmentId: data.appointment.id,
+            }),
+          });
+
+          const stripeData = await stripeRes.json();
+          if (stripeData.url) {
+            window.location.href = stripeData.url; // Τον στέλνουμε στο Stripe!
+            return;
+          }
+        }
+
+        // ΑΝ ΔΙΑΛΕΞΕ ΤΑΜΕΙΟ (STORE)
+        setIsSuccess(true);
+        setUserStrikes(data.strikes || 0);
       } else if (res.status === 403) {
         setUserStrikes(data.strikes || 3);
         setBlockReason("STRIKES");
