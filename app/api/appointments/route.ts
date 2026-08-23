@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { sendConfirmationEmail } from "@/app/lib/mailer"; // ή από όποιο path το έβαλες
 
 const prisma = new PrismaClient();
 
@@ -68,6 +69,7 @@ export async function POST(req: Request) {
     }
 
     // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ
+    // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
@@ -78,7 +80,24 @@ export async function POST(req: Request) {
         time,
         serviceId,
       },
+      include: { service: true }, // Το χρειαζόμαστε για να πάρουμε το όνομα της υπηρεσίας για το email
     });
+
+    // 4. ΑΠΟΣΤΟΛΗ EMAIL ΕΠΙΒΕΒΑΙΩΣΗΣ (Αν έβαλε email)
+    if (customerEmail) {
+      try {
+        await sendConfirmationEmail(
+          customerEmail,
+          customerName,
+          date, // Σε μορφή YYYY-MM-DD
+          time,
+          newAppointment.service?.name || "Υπηρεσία Barbershop",
+        );
+      } catch (emailError) {
+        // Δεν μπλοκάρουμε την κράτηση αν αποτύχει το email, απλά το καταγράφουμε
+        console.error("Failed to send email:", emailError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
