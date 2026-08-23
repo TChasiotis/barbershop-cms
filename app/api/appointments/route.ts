@@ -70,6 +70,7 @@ export async function POST(req: Request) {
 
     // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ
     // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ
+    // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
@@ -80,24 +81,31 @@ export async function POST(req: Request) {
         time,
         serviceId,
       },
-      include: { service: true }, // Το χρειαζόμαστε για να πάρουμε το όνομα της υπηρεσίας για το email
+      include: { service: true },
     });
 
-    // 4. ΑΠΟΣΤΟΛΗ EMAIL ΕΠΙΒΕΒΑΙΩΣΗΣ (Αν έβαλε email)
-    if (customerEmail) {
+    // -------- ΟΙ "ΡΟΥΦΙΑΝΟΙ" ΜΑΣ --------
+    console.log("=== CHECKING EMAIL LOGIC ===");
+    console.log("Email πελάτη από φόρμα:", customerEmail);
+
+    if (customerEmail && customerEmail.trim() !== "") {
+      console.log("Προσπάθεια αποστολής email στο:", customerEmail);
       try {
         await sendConfirmationEmail(
           customerEmail,
           customerName,
-          date, // Σε μορφή YYYY-MM-DD
+          date,
           time,
           newAppointment.service?.name || "Υπηρεσία Barbershop",
         );
+        console.log("✅ ΤΟ EMAIL ΣΤΑΛΘΗΚΕ ΕΠΙΤΥΧΩΣ!");
       } catch (emailError) {
-        // Δεν μπλοκάρουμε την κράτηση αν αποτύχει το email, απλά το καταγράφουμε
-        console.error("Failed to send email:", emailError);
+        console.error("❌ ΣΦΑΛΜΑ ΚΑΤΑ ΤΗΝ ΑΠΟΣΤΟΛΗ EMAIL:", emailError);
       }
+    } else {
+      console.log("⚠️ Το πεδίο email ήταν άδειο, δεν στάλθηκε κάτι.");
     }
+    // -------------------------------------
 
     return NextResponse.json({
       success: true,
