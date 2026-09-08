@@ -33,7 +33,7 @@ export async function POST(req: Request) {
       ],
       mode: "payment",
       // ΕΔΩ ΠΕΡΝΑΜΕ ΤΑ ΔΕΔΟΜΕΝΑ ΣΤΗ ΣΕΛΙΔΑ ΕΠΙΤΥΧΙΑΣ ΟΤΑΝ ΓΥΡΙΣΕΙ:
-      success_url: `${baseUrl}/booking/success?date=${date}&time=${time}&lang=${lang}&strikes=${strikes}`,
+      success_url: `${baseUrl}/booking/success?id=${appointmentId}&date=${date}&time=${time}&lang=${lang}&strikes=${strikes}`,
       cancel_url: `${baseUrl}/?canceled=true`,
       metadata: { appointmentId },
     });

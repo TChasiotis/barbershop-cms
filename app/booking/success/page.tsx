@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
+import { Suspense, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import {
   Check,
@@ -14,10 +14,44 @@ import Link from "next/link";
 
 function SuccessContent() {
   const searchParams = useSearchParams();
+  const appointmentId = searchParams.get("id"); // Πήραμε και το ID από το URL
   const dateStr = searchParams.get("date");
   const time = searchParams.get("time");
   const lang = searchParams.get("lang") || "el";
   const strikes = parseInt(searchParams.get("strikes") || "0", 10);
+
+  // --- ΛΟΓΙΚΗ ΑΠΟΣΤΟΛΗΣ EMAIL ---
+  // Ασπίδα για να μην σταλεί το email 2 φορές (λόγω React Strict Mode)
+  const hasTriggeredEmail = useRef(false);
+
+  useEffect(() => {
+    // Αν υπάρχει ID στο URL και δεν έχουμε ξαναστείλει το email
+    if (appointmentId && !hasTriggeredEmail.current) {
+      hasTriggeredEmail.current = true; // Το κλειδώνουμε
+
+      console.log(
+        `[Frontend] Εντοπίστηκε ραντεβού με ID: ${appointmentId}. Κλήση του API...`,
+      );
+
+      fetch("/api/send-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId }),
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          console.log("[Frontend] Απάντηση από το API Email:", data);
+        })
+        .catch((err) => {
+          console.error("[Frontend] Αποτυχία κλήσης API Email:", err);
+        });
+    } else if (!appointmentId) {
+      console.warn(
+        "[Frontend] Προσοχή: Το URL δεν έχει ?id= , άρα δεν μπορεί να σταλεί email!",
+      );
+    }
+  }, [appointmentId]);
+  // ------------------------------
 
   const formatDate = (dateString: string | null, lang: string) => {
     if (!dateString) return "";

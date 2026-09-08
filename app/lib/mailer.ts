@@ -2,7 +2,9 @@ import nodemailer from "nodemailer";
 
 // Σύνδεση με το Gmail σου
 export const transporter = nodemailer.createTransport({
-  service: "gmail",
+  host: "smtp.gmail.com",
+  port: 465, // Ασφαλής θύρα
+  secure: true, // Χρήση SSL/TLS
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,

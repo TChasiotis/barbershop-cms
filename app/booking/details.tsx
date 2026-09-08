@@ -14,7 +14,7 @@ import {
 
 export default function Details({ formData, setFormData, onNext, lang }: any) {
   const [loading, setLoading] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false); // Το αφήνουμε για να μην πειράξουμε τα states σου
+  const [isSuccess, setIsSuccess] = useState(false);
   const [isBlocked, setIsBlocked] = useState(false);
   const [blockReason, setBlockReason] = useState<
     "LOCAL_STORAGE" | "STRIKES" | "PHONE_EXISTS" | ""
@@ -163,7 +163,7 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
         }
 
         // 3. ΑΝ ΗΤΑΝ ΜΕΤΡΗΤΑ, ΤΟΝ ΣΤΕΛΝΟΥΜΕ ΣΤΗΝ ΚΟΙΝΗ ΣΕΛΙΔΑ ΕΠΙΤΥΧΙΑΣ ΣΤΟ /booking/success
-        window.location.href = `/booking/success?date=${dateStr}&time=${formData.time}&lang=${lang || "el"}&strikes=${currentStrikes}`;
+        window.location.href = `/booking/success?id=${data.appointment?.id}&date=${dateStr}&time=${formData.time}&lang=${lang || "el"}&strikes=${currentStrikes}`;
         return;
       } else if (res.status === 403) {
         setUserStrikes(data.strikes || 3);
