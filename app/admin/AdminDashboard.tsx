@@ -15,6 +15,7 @@ import {
   Loader2,
   Eye,
   EyeOff,
+  CalendarOff, // <--- ΠΡΟΣΤΕΘΗΚΕ
 } from "lucide-react";
 import { updateAdminSettings } from "./actions";
 
@@ -24,6 +25,7 @@ import ServicesTab from "./tabs/ServicesTab";
 import ProductsTab from "./tabs/ProductsTab";
 import GalleryTab from "./tabs/GalleryTab";
 import StrikesTab from "./tabs/StrikesTab";
+import BlockedDaysTab from "./tabs/BlockedDaysTab"; // <--- ΠΡΟΣΤΕΘΗΚΕ
 
 export default function AdminDashboard({
   initialServices,
@@ -31,10 +33,16 @@ export default function AdminDashboard({
   initialGallery = [],
   initialStrikes = [],
   initialAppointments = [],
+  initialBlockedDays = [], // <--- ΠΡΟΣΤΕΘΗΚΕ
   monthlyUploadsCount = 0,
 }: any) {
   const [activeTab, setActiveTab] = useState<
-    "appointments" | "services" | "products" | "gallery" | "strikes"
+    | "appointments"
+    | "services"
+    | "products"
+    | "gallery"
+    | "strikes"
+    | "blockedDays" // <--- ΠΡΟΣΤΕΘΗΚΕ
   >("appointments");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -174,6 +182,18 @@ export default function AdminDashboard({
             >
               <Camera size={18} /> Our Work
             </button>
+
+            {/* <--- ΝΕΟ ΚΟΥΜΠΙ ΓΙΑ ΤΑ BLOCKED DAYS ---> */}
+            <button
+              onClick={() => {
+                setActiveTab("blockedDays");
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "blockedDays" ? "bg-white text-zinc-950" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}
+            >
+              <CalendarOff size={18} /> Blocked Days
+            </button>
+
             <button
               onClick={() => {
                 setActiveTab("strikes");
@@ -229,6 +249,12 @@ export default function AdminDashboard({
           {activeTab === "gallery" && (
             <GalleryTab initialGallery={initialGallery} />
           )}
+
+          {/* <--- ΝΕΟ TAB RENDER ---> */}
+          {activeTab === "blockedDays" && (
+            <BlockedDaysTab initialBlockedDays={initialBlockedDays} />
+          )}
+
           {activeTab === "strikes" && (
             <StrikesTab initialStrikes={initialStrikes} />
           )}
@@ -253,7 +279,6 @@ export default function AdminDashboard({
               </button>
             </div>
             <form onSubmit={handleUpdateSettings} className="p-6 space-y-5">
-              {/* (Ο κώδικας του Settings form είναι ακριβώς ο ίδιος, τον συμπτύσσω για εξοικονόμηση χώρου, αντέγραψέ τον από το παλιό ή άστον έτσι) */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-1.5">
                   Old Password *
