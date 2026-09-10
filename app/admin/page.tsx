@@ -19,13 +19,18 @@ export default async function AdminPage() {
     orderBy: { updatedAt: "desc" },
   });
 
-  // 2. ΕΔΩ ΗΤΑΝ ΤΟ ΛΑΘΟΣ! Τραβάμε ΤΑ ΡΑΝΤΕΒΟΥ απευθείας από τη βάση!
+  // 2. Τραβάμε τα Ραντεβού
   const appointments = await prisma.appointment.findMany({
     orderBy: [{ date: "desc" }, { time: "desc" }],
-    include: { service: true }, // Φέρνει και τα στοιχεία της υπηρεσίας
+    include: { service: true },
   });
 
-  // 3. Υπολογισμός Uploads για το Remove.bg (Αν το έχεις κρατήσει)
+  // 3. --- ΝΕΟ: Τραβάμε τις Κλειδωμένες Μέρες ---
+  const blockedDays = await prisma.blockedDay.findMany({
+    orderBy: { date: "asc" },
+  });
+
+  // 4. Υπολογισμός Uploads για το Remove.bg
   const firstDayOfMonth = new Date();
   firstDayOfMonth.setDate(1);
   firstDayOfMonth.setHours(0, 0, 0, 0);
@@ -34,14 +39,15 @@ export default async function AdminPage() {
     where: { createdAt: { gte: firstDayOfMonth } },
   });
 
-  // 4. Περνάμε ΟΛΑ τα δεδομένα (και τα ραντεβού) στο Dashboard Component
+  // 5. Περνάμε ΟΛΑ τα δεδομένα στο Dashboard
   return (
     <AdminDashboard
       initialServices={services}
       initialProducts={products}
       initialGallery={gallery}
       initialStrikes={strikes}
-      initialAppointments={appointments} // <--- ΑΥΤΟ ΕΛΕΙΠΕ ΚΑΙ ΗΤΑΝ ΑΔΕΙΟ ΤΟ AGENDA!
+      initialAppointments={appointments}
+      initialBlockedDays={blockedDays} // <--- ΤΑ ΠΕΡΝΑΜΕ ΕΔΩ ΣΤΟ DASHBOARD
       monthlyUploadsCount={monthlyUploads}
     />
   );
