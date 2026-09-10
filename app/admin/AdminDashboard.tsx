@@ -25,7 +25,7 @@ import ServicesTab from "./tabs/ServicesTab";
 import ProductsTab from "./tabs/ProductsTab";
 import GalleryTab from "./tabs/GalleryTab";
 import StrikesTab from "./tabs/StrikesTab";
-import BlockedDaysTab from "./tabs/BlockedDaysTab"; // <--- ΠΡΟΣΤΕΘΗΚΕ
+import BlockedDaysTab from "./tabs/BlockedDaysTab";
 
 export default function AdminDashboard({
   initialServices,
