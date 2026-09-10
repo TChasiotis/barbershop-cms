@@ -107,6 +107,7 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
           customerPhone: formData.customerPhone,
           customerEmail: formData.customerEmail,
           paymentMethod: formData.paymentMethod,
+          lang: lang || "el",
         }),
       });
 

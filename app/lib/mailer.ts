@@ -8,9 +8,11 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-// Ρυθμίσεις Καταστήματος (Άλλαξε το τηλέφωνο με το πραγματικό)
+// Ρυθμίσεις Καταστήματος
 const SHOP_PHONE = "+30 210 1234567";
 const SHOP_ADDRESS = "12 Tech Avenue, Athens";
+const LOGO_URL =
+  "https://whrxzzmokjsbgluz.public.blob.vercel-storage.com/logo_removebg.png";
 
 // Λεξικό Μεταφράσεων
 const dict = {
@@ -73,8 +75,13 @@ const buildEmailHTML = (
         
         <!-- Header / Logo Area -->
         <div style="background-color: #09090b; padding: 40px 20px; text-align: center;">
-          <h1 style="color: #ffffff; margin: 0; font-size: 28px; font-weight: 900; letter-spacing: 3px;">URBAN FADE</h1>
-          <p style="color: #a1a1aa; font-size: 12px; margin-top: 10px; font-weight: bold; letter-spacing: 2px;">${subtitle}</p>
+          
+          <!-- Το Logo με το λευκό φόντο από πίσω -->
+          <div style="background-color: #ffffff; display: inline-block; padding: 12px 24px; border-radius: 12px; margin-bottom: 15px;">
+            <img src="${LOGO_URL}" alt="Urban Fade" style="max-height: 55px; width: auto; display: block;" />
+          </div>
+          
+          <p style="color: #a1a1aa; font-size: 12px; margin: 0; font-weight: bold; letter-spacing: 2px;">${subtitle}</p>
         </div>
         
         <!-- Main Body -->
@@ -110,7 +117,7 @@ const buildEmailHTML = (
   `;
 };
 
-// 1. Email Επιβεβαίωσης (Δέχεται πλέον το lang, με προεπιλογή τα Ελληνικά)
+// 1. Email Επιβεβαίωσης
 export async function sendConfirmationEmail(
   toEmail: string,
   customerName: string,

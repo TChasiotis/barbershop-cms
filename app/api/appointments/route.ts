@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { sendConfirmationEmail } from "@/app/lib/mailer"; // ΠΡΟΣΘΗΚΗ: Εισαγωγή της συνάρτησης του email
 
 const prisma = new PrismaClient();
 
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
       customerPhone,
       customerEmail,
       paymentMethod,
+      lang, // ΠΡΟΣΘΗΚΗ: Διαβάζουμε και τη γλώσσα από το frontend
     } = body;
 
     // 1. ΕΛΕΓΧΟΣ STRIKES (No-Shows)
@@ -47,7 +49,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ (ΧΩΡΙΣ EMAIL ΕΔΩ!)
+    // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
@@ -61,6 +63,24 @@ export async function POST(req: Request) {
       },
       include: { service: true },
     });
+
+    // 4. ΑΠΟΣΤΟΛΗ EMAIL ΕΠΙΒΕΒΑΙΩΣΗΣ (ΝΕΟ)
+    // Αν ο πελάτης έχει δώσει email, του στέλνουμε την επιβεβαίωση στην επιλεγμένη γλώσσα
+    if (customerEmail) {
+      // Τυλίγουμε την κλήση σε try/catch για να μην αποτύχει η κράτηση αν υπάρξει σφάλμα στο email
+      try {
+        await sendConfirmationEmail(
+          customerEmail,
+          customerName,
+          date,
+          time,
+          newAppointment.service?.name || "Υπηρεσία",
+          lang || "el",
+        );
+      } catch (emailError) {
+        console.error("Σφάλμα αποστολής email επιβεβαίωσης:", emailError);
+      }
+    }
 
     return NextResponse.json({
       success: true,
