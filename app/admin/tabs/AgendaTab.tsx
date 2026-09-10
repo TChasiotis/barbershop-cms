@@ -6,7 +6,6 @@ import {
   CalendarIcon,
   ChevronLeft,
   ChevronRight,
-  CalendarDays,
   X,
   User,
   Phone,
@@ -15,8 +14,9 @@ import {
   Wallet,
   Ban,
   ShieldAlert,
+  Clock, // Προσθήκη για το νέο εικονίδιο
 } from "lucide-react";
-import { updateAppointmentStatus } from "../actions";
+import { updateAppointmentStatus, rescheduleAppointment } from "../actions"; // Εισαγωγή του νέου action
 
 // Συνάρτηση υπολογισμού λεπτών
 function parseDurationToMinutes(durationStr: string) {
@@ -44,9 +44,17 @@ export default function AgendaTab({
   const [viewMonth, setViewMonth] = useState(
     new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1),
   );
+
   const [selectedAppointment, setSelectedAppointment] = useState<any | null>(
     null,
   );
+
+  // --- ΝΕΑ STATES ΓΙΑ ΤΗ ΜΕΤΑΚΙΝΗΣΗ (RESCHEDULE) ---
+  const [isRescheduling, setIsRescheduling] = useState(false);
+  const [newDate, setNewDate] = useState("");
+  const [newTime, setNewTime] = useState("");
+  const [isRescheduleLoading, setIsRescheduleLoading] = useState(false);
+  // ------------------------------------------------
 
   const today = new Date();
   const minMonthView = new Date(today.getFullYear(), today.getMonth() - 3, 1);
@@ -101,7 +109,6 @@ export default function AgendaTab({
   const selectedDateStr = `${selectedDate.getFullYear()}-${(selectedDate.getMonth() + 1).toString().padStart(2, "0")}-${selectedDate.getDate().toString().padStart(2, "0")}`;
 
   const dailyAppointments = initialAppointments.filter((app: any) => {
-    // Το Prisma επιστρέφει "2026-08-08T00:00:00.000Z". Κόβουμε στο 'T' και κρατάμε το πρώτο κομμάτι!
     const appDateStr = new Date(app.date).toISOString().split("T")[0];
     return appDateStr === selectedDateStr;
   });
@@ -149,6 +156,28 @@ export default function AgendaTab({
     month: "long",
     year: "numeric",
   }).format(selectedDate);
+
+  // --- ΣΥΝΑΡΤΗΣΗ ΥΠΟΒΟΛΗΣ ΓΙΑ ΤΗ ΜΕΤΑΚΙΝΗΣΗ ---
+  const handleRescheduleSubmit = async () => {
+    if (!newDate || !newTime) return;
+    setIsRescheduleLoading(true);
+
+    const res = await rescheduleAppointment(
+      selectedAppointment.id,
+      newDate,
+      newTime,
+    );
+
+    setIsRescheduleLoading(false);
+    if (res?.success) {
+      alert("Το ραντεβού μετακινήθηκε επιτυχώς!");
+      setIsRescheduling(false);
+      setSelectedAppointment(null);
+      router.refresh();
+    } else {
+      alert(res?.error || "Προέκυψε σφάλμα.");
+    }
+  };
 
   return (
     <>
@@ -257,7 +286,10 @@ export default function AgendaTab({
               return (
                 <div
                   key={app.id}
-                  onClick={() => setSelectedAppointment(app)}
+                  onClick={() => {
+                    setSelectedAppointment(app);
+                    setIsRescheduling(false); // Reset το reschedule state
+                  }}
                   className={`flex items-center gap-6 p-4 md:p-5 cursor-pointer transition-colors border-b border-zinc-100 ${
                     app.status === "PENDING"
                       ? "hover:bg-zinc-50 bg-white"
@@ -299,21 +331,27 @@ export default function AgendaTab({
         </div>
       </div>
 
-      {/* MODAL ΛΕΠΤΟΜΕΡΕΙΩΝ ΡΑΝΤΕΒΟΥ */}
+      {/* MODAL ΛΕΠΤΟΜΕΡΕΙΩΝ Ή ΜΕΤΑΚΙΝΗΣΗΣ ΡΑΝΤΕΒΟΥ */}
       {selectedAppointment && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm">
           <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden flex flex-col animate-in fade-in zoom-in duration-200">
             <div className="p-6 border-b border-zinc-100 flex justify-between items-start bg-zinc-50">
               <div>
                 <h3 className="text-2xl font-black text-zinc-900 tracking-tight">
-                  {selectedAppointment.time}
+                  {isRescheduling ? "Αλλαγή Ώρας" : selectedAppointment.time}
                 </h3>
                 <p className="text-sm font-bold text-zinc-500 mt-1">
                   {selectedAppointment.service?.name || "Άγνωστη Υπηρεσία"}
                 </p>
               </div>
               <button
-                onClick={() => setSelectedAppointment(null)}
+                onClick={() => {
+                  if (isRescheduling) {
+                    setIsRescheduling(false); // Επιστροφή στις λεπτομέρειες
+                  } else {
+                    setSelectedAppointment(null); // Κλείσιμο modal
+                  }
+                }}
                 className="text-zinc-400 hover:text-zinc-900 bg-white p-2 rounded-full shadow-sm"
               >
                 <X size={20} />
@@ -321,94 +359,160 @@ export default function AgendaTab({
             </div>
 
             <div className="p-6 space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center gap-3 text-zinc-700">
-                  <User size={20} className="text-zinc-400 flex-shrink-0" />
-                  <span className="font-bold text-lg text-zinc-900">
-                    {selectedAppointment.customerName}
-                  </span>
-                </div>
-                <div className="flex items-center gap-3 text-zinc-700">
-                  <Phone size={20} className="text-zinc-400 flex-shrink-0" />
-                  <a
-                    href={`tel:${selectedAppointment.customerPhone}`}
-                    className="font-medium hover:text-zinc-900 hover:underline"
-                  >
-                    {selectedAppointment.customerPhone}
-                  </a>
-                </div>
-                {selectedAppointment.customerEmail && (
-                  <div className="flex items-center gap-3 text-zinc-700">
-                    <Mail size={20} className="text-zinc-400 flex-shrink-0" />
-                    <span className="font-medium break-all">
-                      {selectedAppointment.customerEmail}
-                    </span>
-                  </div>
-                )}
-                <div className="flex items-center gap-3 text-zinc-700">
-                  {selectedAppointment.paymentMethod === "ONLINE" ? (
-                    <CreditCard
-                      size={20}
-                      className="text-zinc-400 flex-shrink-0"
+              {/* ΑΝ ΕΙΜΑΣΤΕ ΣΕ ΚΑΤΑΣΤΑΣΗ "ΑΛΛΑΓΗΣ ΩΡΑΣ" */}
+              {isRescheduling ? (
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">
+                      Νέα Ημερομηνία
+                    </label>
+                    <input
+                      type="date"
+                      value={newDate}
+                      onChange={(e) => setNewDate(e.target.value)}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold text-zinc-900 outline-none focus:border-zinc-900"
                     />
-                  ) : (
-                    <Wallet size={20} className="text-zinc-400 flex-shrink-0" />
-                  )}
-                  <span className="font-medium">
-                    Πληρωμή:{" "}
-                    <strong className="text-zinc-900">
-                      {selectedAppointment.paymentMethod === "ONLINE"
-                        ? "Online"
-                        : "Στο Ταμείο"}
-                    </strong>
-                  </span>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-zinc-600 mb-2">
+                      Νέα Ώρα
+                    </label>
+                    <input
+                      type="time"
+                      value={newTime}
+                      step={1800} // Βήματα 30 λεπτών
+                      onChange={(e) => setNewTime(e.target.value)}
+                      className="w-full px-4 py-3 bg-zinc-50 border border-zinc-200 rounded-xl font-bold text-zinc-900 outline-none focus:border-zinc-900"
+                    />
+                  </div>
+                  <button
+                    onClick={handleRescheduleSubmit}
+                    disabled={!newDate || !newTime || isRescheduleLoading}
+                    className="w-full bg-zinc-950 text-white py-3.5 rounded-xl font-bold hover:bg-zinc-800 transition-colors disabled:opacity-50 mt-4"
+                  >
+                    {isRescheduleLoading
+                      ? "Αποθήκευση..."
+                      : "Επιβεβαίωση Αλλαγής"}
+                  </button>
                 </div>
-              </div>
+              ) : (
+                // ΑΝ ΕΙΜΑΣΤΕ ΣΤΙΣ ΑΠΛΕΣ ΛΕΠΤΟΜΕΡΕΙΕΣ
+                <>
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 text-zinc-700">
+                      <User size={20} className="text-zinc-400 flex-shrink-0" />
+                      <span className="font-bold text-lg text-zinc-900">
+                        {selectedAppointment.customerName}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-zinc-700">
+                      <Phone
+                        size={20}
+                        className="text-zinc-400 flex-shrink-0"
+                      />
+                      <a
+                        href={`tel:${selectedAppointment.customerPhone}`}
+                        className="font-medium hover:text-zinc-900 hover:underline"
+                      >
+                        {selectedAppointment.customerPhone}
+                      </a>
+                    </div>
+                    {selectedAppointment.customerEmail && (
+                      <div className="flex items-center gap-3 text-zinc-700">
+                        <Mail
+                          size={20}
+                          className="text-zinc-400 flex-shrink-0"
+                        />
+                        <span className="font-medium break-all">
+                          {selectedAppointment.customerEmail}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-3 text-zinc-700">
+                      {selectedAppointment.paymentMethod === "ONLINE" ? (
+                        <CreditCard
+                          size={20}
+                          className="text-zinc-400 flex-shrink-0"
+                        />
+                      ) : (
+                        <Wallet
+                          size={20}
+                          className="text-zinc-400 flex-shrink-0"
+                        />
+                      )}
+                      <span className="font-medium">
+                        Πληρωμή:{" "}
+                        <strong className="text-zinc-900">
+                          {selectedAppointment.paymentMethod === "ONLINE"
+                            ? "Online"
+                            : "Στο Ταμείο"}
+                        </strong>
+                      </span>
+                    </div>
+                  </div>
 
-              {selectedAppointment.status === "PENDING" && (
-                <div className="pt-6 border-t border-zinc-100 flex flex-col gap-3">
-                  <button
-                    onClick={async () => {
-                      if (
-                        window.confirm(
-                          "Επιβεβαίωση Ακύρωσης; Η ώρα θα ελευθερωθεί αμέσως στο σύστημα.",
-                        )
-                      ) {
-                        await updateAppointmentStatus(
-                          selectedAppointment.id,
-                          "CANCELLED",
-                          selectedAppointment.customerPhone,
-                        );
-                        setSelectedAppointment(null);
-                        router.refresh();
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold rounded-xl transition-colors"
-                  >
-                    <Ban size={18} /> Ακύρωση Ραντεβού
-                  </button>
-                  <button
-                    onClick={async () => {
-                      if (
-                        window.confirm(
-                          "Ο πελάτης δεν εμφανίστηκε; Θα του δοθεί 1 Strike αυτόματα.",
-                        )
-                      ) {
-                        await updateAppointmentStatus(
-                          selectedAppointment.id,
-                          "NO-SHOW",
-                          selectedAppointment.customerPhone,
-                          selectedAppointment.customerEmail,
-                        );
-                        setSelectedAppointment(null);
-                        router.refresh();
-                      }
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition-colors"
-                  >
-                    <ShieldAlert size={18} /> Δεν Εμφανίστηκε (Strike)
-                  </button>
-                </div>
+                  {selectedAppointment.status === "PENDING" && (
+                    <div className="pt-6 border-t border-zinc-100 flex flex-col gap-3">
+                      {/* ΝΕΟ ΚΟΥΜΠΙ ΑΛΛΑΓΗΣ ΩΡΑΣ */}
+                      <button
+                        onClick={() => {
+                          // Προεπιλογή της παλιάς ημερομηνίας/ώρας στη φόρμα
+                          const oldDateStr = new Date(selectedAppointment.date)
+                            .toISOString()
+                            .split("T")[0];
+                          setNewDate(oldDateStr);
+                          setNewTime(selectedAppointment.time);
+                          setIsRescheduling(true);
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl transition-colors"
+                      >
+                        <Clock size={18} /> Μετακίνηση Ραντεβού
+                      </button>
+
+                      <button
+                        onClick={async () => {
+                          if (
+                            window.confirm(
+                              "Επιβεβαίωση Ακύρωσης; Η ώρα θα ελευθερωθεί αμέσως στο σύστημα.",
+                            )
+                          ) {
+                            await updateAppointmentStatus(
+                              selectedAppointment.id,
+                              "CANCELLED",
+                              selectedAppointment.customerPhone,
+                            );
+                            setSelectedAppointment(null);
+                            router.refresh();
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold rounded-xl transition-colors"
+                      >
+                        <Ban size={18} /> Ακύρωση Ραντεβού
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (
+                            window.confirm(
+                              "Ο πελάτης δεν εμφανίστηκε; Θα του δοθεί 1 Strike αυτόματα.",
+                            )
+                          ) {
+                            await updateAppointmentStatus(
+                              selectedAppointment.id,
+                              "NO-SHOW",
+                              selectedAppointment.customerPhone,
+                              selectedAppointment.customerEmail,
+                            );
+                            setSelectedAppointment(null);
+                            router.refresh();
+                          }
+                        }}
+                        className="w-full flex items-center justify-center gap-2 py-3.5 bg-red-50 hover:bg-red-100 text-red-600 font-bold rounded-xl transition-colors"
+                      >
+                        <ShieldAlert size={18} /> Δεν Εμφανίστηκε (Strike)
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>

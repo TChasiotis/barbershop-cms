@@ -297,6 +297,12 @@ export default function Details({ formData, setFormData, onNext, lang }: any) {
               }
               className="w-full p-4 bg-white border-2 border-zinc-200 rounded-xl outline-none focus:border-zinc-900 font-bold text-zinc-900 placeholder:text-zinc-400 transition-colors"
             />
+            <p className="text-xs text-zinc-500 mt-2 flex items-center gap-1.5">
+              <Info size={14} className="text-zinc-400 flex-shrink-0" />
+              {lang === "el"
+                ? "Συμπληρώστε το για να λάβετε το ψηφιακό εισιτήριο και υπενθύμιση 30' πριν."
+                : "Fill this in to receive your digital ticket and a 30-min reminder."}
+            </p>
           </div>
         </div>
       </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   ChevronLeft,
@@ -15,6 +15,22 @@ export default function Calendar({ formData, setFormData, onNext, lang }: any) {
   const [currentMonthView, setCurrentMonthView] = useState(
     new Date(today.getFullYear(), today.getMonth(), 1),
   );
+
+  // --- ΝΕΟ STATE ΓΙΑ ΤΙΣ ΚΛΕΙΔΩΜΕΝΕΣ ΜΕΡΕΣ ---
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+
+  // Ρωτάμε τη βάση ποιες μέρες έχει κλειδώσει ο Admin
+  useEffect(() => {
+    fetch("/api/blocked-days")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.blockedDates) {
+          setBlockedDates(data.blockedDates);
+        }
+      })
+      .catch((err) => console.error("Error fetching blocked days:", err));
+  }, []);
+  // ------------------------------------------
 
   const maxMonthView = new Date(today.getFullYear(), today.getMonth() + 3, 1);
 
@@ -158,7 +174,19 @@ export default function Calendar({ formData, setFormData, onNext, lang }: any) {
               currentMonthView.getMonth(),
               day,
             );
+
+            // Μετατροπή της τρέχουσας μέρας σε YYYY-MM-DD για σύγκριση
+            const dateString = `${thisDate.getFullYear()}-${(thisDate.getMonth() + 1).toString().padStart(2, "0")}-${thisDate.getDate().toString().padStart(2, "0")}`;
+
             const isPast = thisDate < today;
+            const isWeekend =
+              thisDate.getDay() === 0 || thisDate.getDay() === 6;
+
+            // Ελέγχουμε αν η μέρα υπάρχει στη λίστα των Blocked Days
+            const isAdminBlocked = blockedDates.includes(dateString);
+
+            // Η μέρα κλειδώνει αν είναι Παρελθόν Ή Σ/Κ Ή Κλειδωμένη από τον Admin
+            const isDisabled = isPast || isWeekend || isAdminBlocked;
 
             const isSelected =
               formData.date &&
@@ -166,22 +194,27 @@ export default function Calendar({ formData, setFormData, onNext, lang }: any) {
               formData.date.getMonth() === currentMonthView.getMonth() &&
               formData.date.getFullYear() === currentMonthView.getFullYear();
 
-            // ΕΔΩ Η ΑΛΛΑΓΗ ΣΤΟ UI
             const baseClass =
               "p-2 md:p-3 rounded-full md:rounded-xl text-center font-medium transition-all text-sm md:text-base ";
-            const pastClass = isPast ? "text-zinc-300 cursor-not-allowed" : "";
+
+            // Αν είναι κλειδωμένη, την κάνουμε γκρι. Αν είναι συγκεκριμένα Admin Blocked, μπορούμε να της δώσουμε λίγο πιο "κόκκινο/απαγορευτικό" χρώμα, αλλά το γκρι είναι πιο minimal.
+            const disabledClass = isDisabled
+              ? "text-zinc-300 cursor-not-allowed"
+              : "";
+
             const selectedClass = isSelected
               ? "bg-zinc-900 text-white shadow-md"
-              : !isPast
+              : !isDisabled
                 ? "text-zinc-900 hover:bg-zinc-100"
                 : "";
 
             return (
               <button
                 key={day}
-                disabled={isPast}
+                disabled={isDisabled}
                 onClick={() => handleSelectDate(day)}
-                className={baseClass + pastClass + selectedClass}
+                className={baseClass + disabledClass + selectedClass}
+                title={isAdminBlocked ? "Μη διαθέσιμη ημέρα" : ""}
               >
                 {day}
               </button>
