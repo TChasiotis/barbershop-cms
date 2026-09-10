@@ -373,3 +373,44 @@ export async function updateAppointmentStatus(
 
   revalidatePath("/admin");
 }
+
+// --- BLOCKED DAYS ACTIONS ---
+export async function addBlockedDay(dateStr: string) {
+  try {
+    const dateObj = new Date(`${dateStr}T00:00:00Z`);
+    await prisma.blockedDay.create({ data: { date: dateObj } });
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return {
+      success: false,
+      error: "Η μέρα είναι ήδη κλειδωμένη ή υπήρξε σφάλμα.",
+    };
+  }
+}
+
+export async function deleteBlockedDay(id: string) {
+  await prisma.blockedDay.delete({ where: { id } });
+  revalidatePath("/admin");
+}
+
+// --- RESCHEDULE APPOINTMENT (Για το βήμα 4) ---
+export async function rescheduleAppointment(
+  id: string,
+  date: string,
+  time: string,
+) {
+  try {
+    await prisma.appointment.update({
+      where: { id },
+      data: {
+        date: new Date(`${date}T00:00:00Z`),
+        time: time,
+      },
+    });
+    revalidatePath("/admin");
+    return { success: true };
+  } catch (error) {
+    return { success: false, error: "Σφάλμα κατά την αλλαγή ώρας." };
+  }
+}
