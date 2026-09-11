@@ -74,7 +74,9 @@ export async function POST(req: Request) {
           customerName,
           date,
           time,
-          newAppointment.service?.name || "Υπηρεσία",
+          lang === "en"
+            ? newAppointment.service?.nameEn || "Service"
+            : newAppointment.service?.name || "Υπηρεσία",
           lang || "el",
         );
       } catch (emailError) {
