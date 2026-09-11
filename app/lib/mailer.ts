@@ -145,7 +145,7 @@ export async function sendConfirmationEmail(
   await transporter.sendMail({
     from: `"Urban Fade Barbershop" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: t.confSubject,
+    subject: `${t.confSubject} (${date})`,
     html: htmlContent,
   });
 }
@@ -154,6 +154,7 @@ export async function sendConfirmationEmail(
 export async function sendReminderEmail(
   toEmail: string,
   customerName: string,
+  date: string,
   time: string,
   serviceName: string,
   lang: "el" | "en" = "el",
@@ -176,7 +177,7 @@ export async function sendReminderEmail(
   await transporter.sendMail({
     from: `"Urban Fade Barbershop" <${process.env.EMAIL_USER}>`,
     to: toEmail,
-    subject: t.remSubject,
+    subject: `${t.remSubject} (${date})`,
     html: htmlContent,
   });
 }

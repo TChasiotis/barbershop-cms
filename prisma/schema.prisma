@@ -64,6 +64,7 @@ model Appointment {
   time          String
   status        String   @default("PENDING")
   serviceId     String
+  lang          String   @default("el")
   
   // ΠΡΟΣΘΕΣΕ ΑΥΤΗ ΤΗ ΓΡΑΜΜΗ:
   reminderSent  Boolean  @default(false)

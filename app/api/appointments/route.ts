@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { sendConfirmationEmail } from "@/app/lib/mailer"; // ΠΡΟΣΘΗΚΗ: Εισαγωγή της συνάρτησης του email
+import { sendConfirmationEmail } from "@/app/lib/mailer";
 
 const prisma = new PrismaClient();
 
@@ -15,10 +15,9 @@ export async function POST(req: Request) {
       customerPhone,
       customerEmail,
       paymentMethod,
-      lang, // ΠΡΟΣΘΗΚΗ: Διαβάζουμε και τη γλώσσα από το frontend
+      lang,
     } = body;
 
-    // 1. ΕΛΕΓΧΟΣ STRIKES (No-Shows)
     const existingAppointments = await prisma.appointment.findMany({
       where: { customerPhone },
     });
@@ -34,7 +33,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2. ΕΛΕΓΧΟΣ ΓΙΑ ΥΠΑΡΧΟΝ ΕΝΕΡΓΟ ΡΑΝΤΕΒΟΥ
     const hasActive = existingAppointments.some((appt) => {
       const apptDateTime = new Date(
         `${appt.date.toISOString().split("T")[0]}T${appt.time}:00`,
@@ -49,7 +47,6 @@ export async function POST(req: Request) {
       );
     }
 
-    // 3. ΔΗΜΙΟΥΡΓΙΑ ΡΑΝΤΕΒΟΥ ΣΤΗ ΒΑΣΗ
     const newAppointment = await prisma.appointment.create({
       data: {
         customerName,
@@ -59,15 +56,12 @@ export async function POST(req: Request) {
         date: new Date(`${date}T00:00:00Z`),
         time,
         serviceId,
-        // Αν χρειάζεται να περάσεις default status, π.χ.: status: "PENDING"
+        lang: lang || "el", // <-- ΑΠΟΘΗΚΕΥΕΤΑΙ Η ΓΛΩΣΣΑ ΣΤΗ ΒΑΣΗ
       },
       include: { service: true },
     });
 
-    // 4. ΑΠΟΣΤΟΛΗ EMAIL ΕΠΙΒΕΒΑΙΩΣΗΣ (ΝΕΟ)
-    // Αν ο πελάτης έχει δώσει email, του στέλνουμε την επιβεβαίωση στην επιλεγμένη γλώσσα
     if (customerEmail) {
-      // Τυλίγουμε την κλήση σε try/catch για να μην αποτύχει η κράτηση αν υπάρξει σφάλμα στο email
       try {
         await sendConfirmationEmail(
           customerEmail,
@@ -80,7 +74,7 @@ export async function POST(req: Request) {
           lang || "el",
         );
       } catch (emailError) {
-        console.error("Σφάλμα αποστολής email επιβεβαίωσης:", emailError);
+        console.error("Σφάλμα αποστολής email:", emailError);
       }
     }
 

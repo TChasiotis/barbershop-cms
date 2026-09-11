@@ -1,64 +1,90 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
-import { sendReminderEmail } from "@/app/lib/mailer";
+import { sendConfirmationEmail } from "@/app/lib/mailer";
 
 const prisma = new PrismaClient();
 
-// Χρησιμοποιούμε GET γιατί τα Cron Jobs συνήθως κάνουν απλές "επισκέψεις" (GET requests)
-export async function GET(req: Request) {
+export async function POST(req: Request) {
   try {
-    console.log("=== ΕΛΕΓΧΟΣ ΓΙΑ REMINDERS ===");
+    const body = await req.json();
+    const {
+      serviceId,
+      date,
+      time,
+      customerName,
+      customerPhone,
+      customerEmail,
+      paymentMethod,
+      lang,
+    } = body;
 
-    // 1. Παίρνουμε την Τωρινή Ώρα ΕΛΛΑΔΟΣ (πολύ σημαντικό για το Vercel)
-    const athensTimeStr = new Date().toLocaleString("en-US", {
-      timeZone: "Europe/Athens",
+    const existingAppointments = await prisma.appointment.findMany({
+      where: { customerPhone },
     });
-    const athensNow = new Date(athensTimeStr);
 
-    // 2. Υπολογίζουμε την ώρα σε 45 λεπτά από τώρα (Το "παράθυρο" του reminder)
-    const athensFuture = new Date(athensNow.getTime() + 35 * 60000);
+    const currentStrikes = existingAppointments.filter(
+      (appt) => appt.status === "NO_SHOW",
+    ).length;
 
-    // 3. Τραβάμε τα ραντεβού που ΕΧΟΥΝ email και ΔΕΝ έχουν πάρει reminder
-    const upcomingAppointments = await prisma.appointment.findMany({
-      where: {
-        reminderSent: false,
-        customerEmail: { not: null },
+    if (currentStrikes >= 3) {
+      return NextResponse.json(
+        { error: "Account blocked due to strikes", strikes: currentStrikes },
+        { status: 403 },
+      );
+    }
+
+    const hasActive = existingAppointments.some((appt) => {
+      const apptDateTime = new Date(
+        `${appt.date.toISOString().split("T")[0]}T${appt.time}:00`,
+      );
+      return apptDateTime > new Date();
+    });
+
+    if (hasActive) {
+      return NextResponse.json(
+        { error: "Active appointment exists" },
+        { status: 409 },
+      );
+    }
+
+    const newAppointment = await prisma.appointment.create({
+      data: {
+        customerName,
+        customerPhone,
+        customerEmail,
+        paymentMethod,
+        date: new Date(`${date}T00:00:00Z`),
+        time,
+        serviceId,
+        lang: lang || "el", // <-- ΑΠΟΘΗΚΕΥΕΤΑΙ Η ΓΛΩΣΣΑ ΣΤΗ ΒΑΣΗ
       },
       include: { service: true },
     });
 
-    let sentCount = 0;
-
-    for (const appt of upcomingAppointments) {
-      // Φτιάχνουμε την ημερομηνία/ώρα του ραντεβού
-      const dateString = appt.date.toISOString().split("T")[0];
-      const appointmentTime = new Date(`${dateString}T${appt.time}:00`);
-
-      // Ελέγχουμε: Είναι το ραντεβού από "Τώρα" μέχρι "Σε 45 λεπτά";
-      if (appointmentTime > athensNow && appointmentTime <= athensFuture) {
-        await sendReminderEmail(
-          appt.customerEmail!,
-          appt.customerName,
-          appt.time,
-          appt.service?.name || "Υπηρεσία",
+    if (customerEmail) {
+      try {
+        await sendConfirmationEmail(
+          customerEmail,
+          customerName,
+          date,
+          time,
+          lang === "en"
+            ? newAppointment.service?.nameEn || "Service"
+            : newAppointment.service?.name || "Υπηρεσία",
+          lang || "el",
         );
-
-        // Σημειώνουμε στη βάση ότι στάλθηκε για να μην ξανασταλεί!
-        await prisma.appointment.update({
-          where: { id: appt.id },
-          data: { reminderSent: true },
-        });
-
-        console.log(
-          `✅ Στάλθηκε reminder στον ${appt.customerName} για τις ${appt.time}`,
-        );
-        sentCount++;
+      } catch (emailError) {
+        console.error("Σφάλμα αποστολής email:", emailError);
       }
     }
 
-    return NextResponse.json({ success: true, remindersSent: sentCount });
+    return NextResponse.json({
+      success: true,
+      appointment: newAppointment,
+      strikes: currentStrikes,
+    });
   } catch (error: any) {
-    console.error("❌ Σφάλμα στα reminders:", error);
+    console.error("Σφάλμα δημιουργίας ραντεβού:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }
