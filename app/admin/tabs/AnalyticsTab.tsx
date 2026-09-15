@@ -29,7 +29,22 @@ export default function AnalyticsTab({
 
   // 3. Υπολογισμός Εσόδων (άθροισμα των τιμών των υπηρεσιών)
   const totalRevenue = filteredAppointments.reduce((sum, appt) => {
-    return sum + (Number(appt.service?.price) || 0);
+    // Βρίσκουμε την υπηρεσία μέσα από το array 'services'
+    const matchedService = services.find((s) => s.id === appt.serviceId);
+
+    if (!matchedService || !matchedService.price) return sum;
+
+    // "Ψαρεύουμε" τον πρώτο αριθμό που υπάρχει μέσα στο string,
+    // αγνοώντας λέξεις όπως "from", "€" κλπ. Υποστηρίζει και δεκαδικά με κόμμα ή τελεία.
+    const priceMatch = String(matchedService.price).match(/\d+([.,]\d+)?/);
+
+    if (priceMatch) {
+      // Αντικαθιστούμε το κόμμα με τελεία (αν υπάρχει) για να το καταλάβει η Javascript
+      const numericPrice = Number(priceMatch[0].replace(",", "."));
+      return sum + numericPrice;
+    }
+
+    return sum;
   }, 0);
 
   // 4. Κατάταξη Υπηρεσιών (Από την πιο δημοφιλή σε αυτή με 0)
