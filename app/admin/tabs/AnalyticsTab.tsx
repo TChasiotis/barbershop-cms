@@ -73,8 +73,7 @@ export default function AnalyticsTab({
 
     return Object.entries(counts)
       .map(([time, count]) => ({ time, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 5); // Κρατάμε μόνο το Τοπ 5
+      .sort((a, b) => b.count - a.count);
   }, [filteredAppointments]);
 
   // Λίστα μηνών για το Dropdown
@@ -178,7 +177,7 @@ export default function AnalyticsTab({
         {/* Δημοφιλέστερες Ώρες */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
           <h3 className="font-bold text-gray-800 mb-5 border-b pb-3 text-lg">
-            Top 5 Ώρες Κρατήσεων
+            Δημοφιλέστερες Ώρες
           </h3>
           <div className="space-y-4">
             {popularTimes.length > 0 ? (
