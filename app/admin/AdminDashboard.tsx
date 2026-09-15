@@ -15,17 +15,19 @@ import {
   Loader2,
   Eye,
   EyeOff,
-  CalendarOff, // <--- ΠΡΟΣΤΕΘΗΚΕ
+  CalendarOff,
+  BarChart3, // <--- Προστέθηκε το εικονίδιο
 } from "lucide-react";
 import { updateAdminSettings } from "./actions";
 
-// --- ΕΙΣΑΓΩΓΗ ΤΩΝ COMPONENTS (TABS) ---
+// --- ΕΙΣΑΓΩΓΗ ΤΩΝ COMPONENTS ΑΠΟ ΤΟΝ ΦΑΚΕΛΟ tabs ---
 import AgendaTab from "./tabs/AgendaTab";
 import ServicesTab from "./tabs/ServicesTab";
 import ProductsTab from "./tabs/ProductsTab";
 import GalleryTab from "./tabs/GalleryTab";
 import StrikesTab from "./tabs/StrikesTab";
 import BlockedDaysTab from "./tabs/BlockedDaysTab";
+import AnalyticsTab from "./tabs/AnalyticsTab";
 
 export default function AdminDashboard({
   initialServices,
@@ -33,7 +35,7 @@ export default function AdminDashboard({
   initialGallery = [],
   initialStrikes = [],
   initialAppointments = [],
-  initialBlockedDays = [], // <--- ΠΡΟΣΤΕΘΗΚΕ
+  initialBlockedDays = [],
   monthlyUploadsCount = 0,
 }: any) {
   const [activeTab, setActiveTab] = useState<
@@ -42,7 +44,8 @@ export default function AdminDashboard({
     | "products"
     | "gallery"
     | "strikes"
-    | "blockedDays" // <--- ΠΡΟΣΤΕΘΗΚΕ
+    | "blockedDays"
+    | "analytics" // <--- Προστέθηκε το state
   >("appointments");
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
@@ -182,8 +185,6 @@ export default function AdminDashboard({
             >
               <Camera size={18} /> Our Work
             </button>
-
-            {/* <--- ΝΕΟ ΚΟΥΜΠΙ ΓΙΑ ΤΑ BLOCKED DAYS ---> */}
             <button
               onClick={() => {
                 setActiveTab("blockedDays");
@@ -192,6 +193,16 @@ export default function AdminDashboard({
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "blockedDays" ? "bg-white text-zinc-950" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}
             >
               <CalendarOff size={18} /> Blocked Days
+            </button>
+
+            <button
+              onClick={() => {
+                setActiveTab("analytics");
+                setIsMobileMenuOpen(false);
+              }}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === "analytics" ? "bg-white text-zinc-950" : "text-zinc-400 hover:bg-zinc-900 hover:text-white"}`}
+            >
+              <BarChart3 size={18} /> Στατιστικά
             </button>
 
             <button
@@ -231,7 +242,7 @@ export default function AdminDashboard({
         </div>
       </aside>
 
-      {/* MAIN CONTENT (Δυναμική φόρτωση των Tabs) */}
+      {/* MAIN CONTENT */}
       <main className="flex-1 p-4 md:pl-72 md:pr-8 md:py-8 bg-zinc-50 min-h-screen relative">
         <div className="max-w-6xl mx-auto">
           {activeTab === "appointments" && (
@@ -249,12 +260,15 @@ export default function AdminDashboard({
           {activeTab === "gallery" && (
             <GalleryTab initialGallery={initialGallery} />
           )}
-
-          {/* <--- ΝΕΟ TAB RENDER ---> */}
           {activeTab === "blockedDays" && (
             <BlockedDaysTab initialBlockedDays={initialBlockedDays} />
           )}
-
+          {activeTab === "analytics" && (
+            <AnalyticsTab
+              appointments={initialAppointments}
+              services={initialServices}
+            />
+          )}
           {activeTab === "strikes" && (
             <StrikesTab initialStrikes={initialStrikes} />
           )}
